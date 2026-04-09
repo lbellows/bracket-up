@@ -295,6 +295,8 @@ export function propagateByes(
     // After propagation pass: look for newly resolvable byes
     for (const m of matches) {
       if (m.status === 'complete') continue;
+      // GF reset match is populated dynamically after GF1 resolves — never auto-resolve it
+      if (m.bracket === 'grand-final' && m.round === 2) continue;
 
       const p1Filled = m.p1Id !== null;
       const p2Filled = m.p2Id !== null;

@@ -13,6 +13,7 @@ import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -24,7 +25,7 @@ import MatchDetailSheet from '../../../components/MatchDetailSheet';
 import { useBracketEngine } from '../../../hooks/useBracketEngine';
 import { useTournament } from '../../../hooks/useTournament';
 import { Match } from '../../../types/tournament';
-import { exportTournamentJSON, exportTournamentText } from '../../../utils/exportUtils';
+import { exportTournamentMarkdown } from '../../../utils/exportUtils';
 
 export default function BracketScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -32,6 +33,7 @@ export default function BracketScreen() {
   const navigation = useNavigation();
   const { tournament, loading, error, recordResult, rescoreMatch } = useTournament(id);
   const [selectedMatch, setSelectedMatch] = useState<Match | null>(null);
+  const [exportLabel, setExportLabel] = useState('Export');
   // Ref so handleSaveResult always sees the current match without needing it as a dep
   const selectedMatchRef = useRef<Match | null>(null);
 
@@ -52,7 +54,7 @@ export default function BracketScreen() {
             style={styles.headerBtn}
             hitSlop={8}
           >
-            <Text style={styles.headerBtnText}>Export</Text>
+            <Text style={styles.headerBtnText}>{exportLabel}</Text>
           </TouchableOpacity>
           {tournament?.status === 'complete' && (
             <TouchableOpacity
@@ -66,27 +68,18 @@ export default function BracketScreen() {
         </View>
       ),
     });
-  }, [tournament, id, navigation, router]);
+  }, [tournament, id, navigation, router, exportLabel]);
 
   const handleExport = useCallback(() => {
     if (!tournament) return;
-    Alert.alert('Export Tournament', 'Choose export format:', [
-      {
-        text: 'JSON (full data)',
-        onPress: () =>
-          exportTournamentJSON(tournament).catch((e) =>
-            Alert.alert('Export failed', e instanceof Error ? e.message : String(e)),
-          ),
-      },
-      {
-        text: 'Text summary',
-        onPress: () =>
-          exportTournamentText(tournament).catch((e) =>
-            Alert.alert('Export failed', e instanceof Error ? e.message : String(e)),
-          ),
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    exportTournamentMarkdown(tournament)
+      .then(() => {
+        if (Platform.OS === 'web' && navigator.clipboard?.writeText) {
+          setExportLabel('Copied!');
+          setTimeout(() => setExportLabel('Export'), 2000);
+        }
+      })
+      .catch((e) => Alert.alert('Export failed', e instanceof Error ? e.message : String(e)));
   }, [tournament]);
 
   // ── Match press handler ───────────────────────────────────────────────────

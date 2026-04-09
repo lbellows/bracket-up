@@ -204,15 +204,13 @@ function handleGrandFinal1(
 ): Tournament {
   const wbChampionId = gf1.p1Id; // WB champion always enters as p1
   const lbChampionId = gf1.p2Id;
+  // Derive the loser from the recorded winner to avoid issues if p1Id === p2Id
+  const gf1LoserId = gf1.winnerId === gf1.p1Id ? gf1.p2Id : gf1.p1Id;
 
-  if (gf1.winnerId === wbChampionId) {
+  if (gf1.winnerId === wbChampionId && wbChampionId !== lbChampionId) {
     // WB champion wins GF1 → tournament over, no reset needed
     if (wbChampionId) setPlacement(participantMap, wbChampionId, 1);
-    if (lbChampionId) {
-      setPlacement(participantMap, lbChampionId, 2);
-      const loser = participantMap.get(lbChampionId);
-      if (loser) loser.eliminated = true;
-    }
+    if (gf1LoserId) setPlacement(participantMap, gf1LoserId, 2);
     return finaliseTournament(tournament, matchMap, participantMap);
   }
 
@@ -229,6 +227,7 @@ function handleGrandFinal1(
     gf2.p2Score = 0;
     gf2.winnerId = null;
     gf2.loserId = null;
+    gf2.isBye = false;
   }
 
   return {
@@ -246,11 +245,7 @@ function handleGrandFinal2(
 ): Tournament {
   const loserId = gf2.loserId;
   if (gf2.winnerId) setPlacement(participantMap, gf2.winnerId, 1);
-  if (loserId) {
-    setPlacement(participantMap, loserId, 2);
-    const loser = participantMap.get(loserId);
-    if (loser) loser.eliminated = true;
-  }
+  if (loserId) setPlacement(participantMap, loserId, 2);
 
   const matchMap = new Map(tournament.matches.map((m) => [m.id, m]));
   return finaliseTournament(tournament, matchMap, participantMap);

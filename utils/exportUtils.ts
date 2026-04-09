@@ -1,109 +1,133 @@
 /**
  * exportUtils.ts
  *
- * Exports tournament data as JSON or plain-text summary, then shares via
- * the device share sheet using expo-sharing.
+ * Exports tournament results as a Markdown file.
+ * - Native: writes to cache dir and opens the system share sheet.
+ * - Web:    copies the Markdown text to the clipboard; falls back to
+ *           triggering a .md file download if the Clipboard API is unavailable.
  */
 
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 import { Tournament } from '../types/tournament';
 
-// ─── JSON export ─────────────────────────────────────────────────────────────
+// ─── Public API ───────────────────────────────────────────────────────────────
 
-export async function exportTournamentJSON(tournament: Tournament): Promise<void> {
-  const json = JSON.stringify(tournament, null, 2);
-  const fileName = `${sanitiseFilename(tournament.name)}_${shortDate(tournament.createdAt)}.json`;
-  const uri = FileSystem.cacheDirectory + fileName;
+export async function exportTournamentMarkdown(tournament: Tournament): Promise<void> {
+  const md = buildMarkdown(tournament);
+  const fileName = `${sanitiseFilename(tournament.name)}_${shortDate(tournament.createdAt)}.md`;
 
-  await FileSystem.writeAsStringAsync(uri, json, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
-
-  await share(uri);
+  if (Platform.OS === 'web') {
+    await webExport(md, fileName);
+  } else {
+    await nativeExport(md, fileName);
+  }
 }
 
-// ─── Plain-text summary export ───────────────────────────────────────────────
+// ─── Markdown builder ─────────────────────────────────────────────────────────
 
-export async function exportTournamentText(tournament: Tournament): Promise<void> {
-  const text = buildTextSummary(tournament);
-  const fileName = `${sanitiseFilename(tournament.name)}_${shortDate(tournament.createdAt)}.txt`;
-  const uri = FileSystem.cacheDirectory + fileName;
-
-  await FileSystem.writeAsStringAsync(uri, text, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
-
-  await share(uri);
-}
-
-// ─── Text builder ─────────────────────────────────────────────────────────────
-
-function buildTextSummary(tournament: Tournament): string {
+function buildMarkdown(tournament: Tournament): string {
   const lines: string[] = [];
-  const participantMap = new Map(tournament.participants.map((p) => [p.id, p]));
+  const pMap = new Map(tournament.participants.map((p) => [p.id, p]));
 
-  lines.push(`🏆  ${tournament.name}`);
-  lines.push(`Format: Double Elimination`);
-  lines.push(`Date: ${new Date(tournament.createdAt).toLocaleDateString()}`);
-  lines.push(`Status: ${tournament.status}`);
+  lines.push(`# ${tournament.name}`);
+  lines.push('');
+  lines.push(`**Format:** Double Elimination`);
+  lines.push(`**Date:** ${new Date(tournament.createdAt).toLocaleDateString()}`);
+  lines.push(`**Status:** ${tournament.status}`);
   lines.push('');
 
-  // Final standings (if complete)
+  // Final standings
   const placed = tournament.participants
     .filter((p) => p.placement !== null)
     .sort((a, b) => (a.placement ?? 99) - (b.placement ?? 99));
 
   if (placed.length > 0) {
-    lines.push('── FINAL STANDINGS ──────────────────────');
+    lines.push('## Final Standings');
+    lines.push('');
+    lines.push('| Place | Player | Record |');
+    lines.push('|-------|--------|--------|');
     for (const p of placed) {
-      const medal = p.placement === 1 ? '🥇' : p.placement === 2 ? '🥈' : p.placement === 3 ? '🥉' : `${p.placement}.`;
-      lines.push(`${medal}  ${p.name}  (${p.wins}W – ${p.losses}L)`);
+      const medal =
+        p.placement === 1 ? '🥇 1st' :
+        p.placement === 2 ? '🥈 2nd' :
+        p.placement === 3 ? '🥉 3rd' :
+        `${p.placement}th`;
+      lines.push(`| ${medal} | ${p.name} | ${p.wins}W – ${p.losses}L |`);
     }
     lines.push('');
   }
 
   // Match history
-  const completed = tournament.matches.filter(
-    (m) => m.status === 'complete' && !m.isBye,
-  );
+  const completed = tournament.matches
+    .filter((m) => m.status === 'complete' && !m.isBye)
+    .sort((a, b) => {
+      const order = { winners: 0, losers: 1, 'grand-final': 2 };
+      const so = order[a.bracket] - order[b.bracket];
+      return so !== 0 ? so : a.round - b.round || a.matchIndex - b.matchIndex;
+    });
 
   if (completed.length > 0) {
-    lines.push('── MATCH HISTORY ────────────────────────');
+    lines.push('## Match History');
+    lines.push('');
+    lines.push('| Round | Player 1 | Score | Player 2 | Winner |');
+    lines.push('|-------|----------|-------|----------|--------|');
     for (const m of completed) {
-      const p1 = participantMap.get(m.p1Id ?? '');
-      const p2 = participantMap.get(m.p2Id ?? '');
+      const p1 = pMap.get(m.p1Id ?? '');
+      const p2 = pMap.get(m.p2Id ?? '');
       if (!p1 || !p2) continue;
 
-      const section =
-        m.bracket === 'winners'
-          ? `WB R${m.round}`
-          : m.bracket === 'losers'
-          ? `LB R${m.round}`
-          : m.round === 2
-          ? 'GF Reset'
-          : 'Grand Final';
+      const round =
+        m.bracket === 'winners' ? `WB R${m.round}` :
+        m.bracket === 'losers'  ? `LB R${m.round}` :
+        m.round === 2           ? 'GF Reset'        : 'Grand Final';
 
-      const w = participantMap.get(m.winnerId ?? '');
+      const winner = pMap.get(m.winnerId ?? '');
       lines.push(
-        `[${section}]  ${p1.name} ${m.p1Score} – ${m.p2Score} ${p2.name}  → ${w?.name ?? '?'} wins`,
+        `| ${round} | ${p1.name} | ${m.p1Score} – ${m.p2Score} | ${p2.name} | **${winner?.name ?? '?'}** |`,
       );
     }
     lines.push('');
   }
 
-  lines.push('Generated by BracketUp');
+  lines.push('---');
+  lines.push('*Generated by BracketUp*');
   return lines.join('\n');
 }
 
-// ─── Share helper ─────────────────────────────────────────────────────────────
+// ─── Platform handlers ────────────────────────────────────────────────────────
 
-async function share(uri: string): Promise<void> {
+async function nativeExport(md: string, fileName: string): Promise<void> {
+  // Dynamic imports keep web bundles free of native-only modules.
+  const [FileSystem, Sharing] = await Promise.all([
+    import('expo-file-system'),
+    import('expo-sharing'),
+  ]);
+
+  const uri = FileSystem.cacheDirectory + fileName;
+  await FileSystem.writeAsStringAsync(uri, md, {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
+
   const available = await Sharing.isAvailableAsync();
-  if (!available) {
-    throw new Error('Sharing is not available on this device');
+  if (!available) throw new Error('Sharing is not available on this device');
+  await Sharing.shareAsync(uri, { mimeType: 'text/markdown', UTI: 'net.daringfireball.markdown' });
+}
+
+async function webExport(md: string, fileName: string): Promise<void> {
+  // Try clipboard first; fall back to file download.
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(md);
+    return; // caller can show "Copied to clipboard" toast
   }
-  await Sharing.shareAsync(uri);
+
+  // Download fallback
+  const blob = new Blob([md], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────

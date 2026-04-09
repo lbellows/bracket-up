@@ -7,10 +7,11 @@
  */
 
 import { useLocalSearchParams } from 'expo-router';
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   SectionList,
   StyleSheet,
   Text,
@@ -20,7 +21,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTournament } from '../../../hooks/useTournament';
 import { Match, Participant, Tournament } from '../../../types/tournament';
-import { exportTournamentJSON, exportTournamentText } from '../../../utils/exportUtils';
+import { exportTournamentMarkdown } from '../../../utils/exportUtils';
 
 const PLACEMENT_MEDALS: Record<number, string> = {
   1: '🥇',
@@ -31,26 +32,19 @@ const PLACEMENT_MEDALS: Record<number, string> = {
 export default function ResultsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { tournament, loading } = useTournament(id);
+  const [copied, setCopied] = useState(false);
 
   const handleExport = useCallback(() => {
     if (!tournament) return;
-    Alert.alert('Export', 'Choose format:', [
-      {
-        text: 'JSON',
-        onPress: () =>
-          exportTournamentJSON(tournament).catch((e) =>
-            Alert.alert('Error', e instanceof Error ? e.message : String(e)),
-          ),
-      },
-      {
-        text: 'Text summary',
-        onPress: () =>
-          exportTournamentText(tournament).catch((e) =>
-            Alert.alert('Error', e instanceof Error ? e.message : String(e)),
-          ),
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    exportTournamentMarkdown(tournament)
+      .then(() => {
+        // On web the clipboard path returns without throwing — show brief confirmation.
+        if (Platform.OS === 'web' && navigator.clipboard?.writeText) {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }
+      })
+      .catch((e) => Alert.alert('Export failed', e instanceof Error ? e.message : String(e)));
   }, [tournament]);
 
   if (loading || !tournament) {
@@ -79,7 +73,9 @@ export default function ResultsScreen() {
         }}
         ListFooterComponent={
           <TouchableOpacity style={styles.exportBtn} onPress={handleExport}>
-            <Text style={styles.exportBtnText}>Export Results</Text>
+            <Text style={styles.exportBtnText}>
+              {copied ? 'Copied to clipboard!' : 'Export as Markdown'}
+            </Text>
           </TouchableOpacity>
         }
       />
@@ -132,11 +128,6 @@ function StandingRow({ participant }: { participant: Participant }) {
           {participant.wins}W – {participant.losses}L
         </Text>
       </View>
-      {participant.eliminated && (
-        <View style={styles.eliminatedBadge}>
-          <Text style={styles.eliminatedText}>OUT</Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -218,13 +209,6 @@ const styles = StyleSheet.create({
   standingInfo: { flex: 1, gap: 2 },
   standingName: { color: '#f1f5f9', fontSize: 15, fontWeight: '700' },
   standingRecord: { color: '#64748b', fontSize: 12 },
-  eliminatedBadge: {
-    backgroundColor: '#7f1d1d',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  eliminatedText: { color: '#fca5a5', fontSize: 11, fontWeight: '700' },
   matchRow: {
     backgroundColor: '#1e293b',
     borderRadius: 10,
