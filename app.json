@@ -11,7 +11,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0f172a"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.bracketup.app"
@@ -33,13 +35,23 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0f172a"
+          "backgroundColor": "#0f172a",
+          "image": "./assets/splash.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "scheme": "bracketup",
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "1c2f15ba-2bac-4489-abc8-b960718bfc76"
+      }
     }
   }
 }

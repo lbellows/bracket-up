@@ -76,7 +76,7 @@ Fill in the following:
 | Field | Suggested content |
 |---|---|
 | App name | BracketUp |
-| Short description (80 chars) | Create and track double-elimination tournament brackets |
+| Short description (80 chars) | Privately create and track double-elimination tournament brackets |
 | Full description (4000 chars) | See template below |
 | App icon | 1024×1024 PNG, no alpha (`assets/icon.png`) |
 | Feature graphic | 1024×500 PNG banner |
@@ -84,18 +84,63 @@ Fill in the following:
 
 **Full description template:**
 ```
-BracketUp makes it easy to run double-elimination tournaments for any sport or game.
+BracketUp makes it easy to run double-elimination tournaments for any sport or game. Fast, simple, and private.  Built to do what it needs to do with ease.
 
 • Add your participants, generate a full bracket automatically
 • Record match results with scores on the spot
 • Track wins, losses, and automatic advancement through Winners and Losers brackets
 • Grand Final reset support — because every comeback story deserves a chance
-• Export results as JSON or a plain-text summary to share with your group
+• Export results as MD or a plain-text summary to share with your group
 
 No account needed. No internet required. All your tournament data stays on your device.
 
 Perfect for table tennis, ping pong, pool, darts, foosball, esports, chess, or any head-to-head competition.
 ```
+
+---
+
+## Closed testing (required before production)
+
+Google requires **12 testers who have installed the app** for **14 consecutive days** before a paid app can go to production.
+
+### Current status
+- Track: **Closed testing - Alpha**, release currently **in review**
+- Tester email list: `brackup-test` (4 users added)
+- Opt-in URL: **greyed out until the release passes review** (usually a few hours)
+
+### Once the release is approved
+1. Go to Play Console → **Testing → Closed testing → Testers tab**
+2. The **Copy link** button will be active — copy the opt-in URL
+3. Share it publicly (see below)
+
+### How testers qualify
+- They visit the opt-in URL and tap **Become a tester**
+- Then they **install the app** via the Play Store link
+- Simply opting in without installing does **not** count
+- Email list testers do **not** automatically count — they must also go through the opt-in URL and install
+
+### Finding 12 testers
+- **r/androidapps** or **r/betatests** — post asking for beta testers, very common and accepted. Include the opt-in URL directly in the post.
+- **r/testingapps** — same deal, smaller but dedicated to this exact purpose
+- **Discord** — tournament/gaming servers (Smash Bros, esports, Challonge communities) are a natural fit
+- **Friends/family** — they count as long as they use the opt-in link and install
+
+### Sample Reddit post
+```
+[BETA] BracketUp — double-elimination tournament bracket app (Android)
+
+Looking for testers for my tournament bracket app. No account needed, no ads, fully offline.
+
+Opt-in link: [paste link here]
+
+Just tap the link, become a tester, and install. That's it — no feedback required, though welcome!
+```
+
+### Notes
+- The 14-day clock starts once you have **12+ installs**, not when you create the track
+- Testers don't need to use the app, just have it installed for 14 days
+- You can proceed to production after 14 days regardless of feedback received
+- Check install count in Play Console → Closed testing → **Statistics tab**
 
 ---
 
