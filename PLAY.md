@@ -7,10 +7,26 @@ Reference for completing the "Finish setting up your app" checklist for BracketU
 ## Let us know about the content of your app
 
 ### Set privacy policy
-- Create a simple privacy policy page (GitHub Gist, GitHub Pages, or any public URL works).
-- BracketUp stores data **locally only** (AsyncStorage, no server). No personal data is collected or transmitted.
-- Suggested language: "BracketUp does not collect, store, or share any personal data. All tournament data is stored locally on your device and never transmitted to any server."
-- Paste the public URL into the Play Console field.
+- The LICENSE file is **not** a privacy policy — you need a separate one.
+- Create a `PRIVACY.md` in the repo with the text below, then link to its raw URL.
+- URL: `https://raw.githubusercontent.com/lbellows/bracket-up/refs/heads/main/PRIVACY.md`
+- Paste this URL into the Play Console field.
+
+**Suggested PRIVACY.md content:**
+```
+# Privacy Policy for BracketUp
+
+Last updated: 2026-04-08
+
+BracketUp does not collect, transmit, store, or share any personal data.
+
+All tournament data you create is stored locally on your device using Android's
+standard app storage. It is never sent to any server, third party, or cloud service.
+
+The app does not use analytics, advertising, crash reporting, or any network services.
+
+If you have questions, contact: [your email]
+```
 
 ### App access
 - Select **"All functionality is available without special access"** — no login required.
@@ -86,9 +102,15 @@ Perfect for table tennis, ping pong, pool, darts, foosball, esports, chess, or a
 ## Set up pricing
 
 ### Create a merchant account
-- Only required if you plan to charge for the app or offer in-app purchases.
-- If BracketUp is **free with no IAP**: you can skip merchant account creation — just set the price to Free.
+- Required since you are charging for the app.
+- Fill out the public merchant profile as an individual (no business entity needed).
+- Business name: your real name or a DBA like "LB Apps"
+- Website: GitHub repo URL is fine
+- What do you sell: "Apps and games"
+- Credit card statement name: something short like "BRACKETUP" or "LB APPS"
+- You are agreeing as an individual — this is normal and fine for solo developers.
 
 ### Set the price of your app
-- Set to **Free**.
-- You can always add optional IAP later without needing to change the base price.
+- Set your price in the "Countries and regions" section after saving the merchant profile.
+- Note: once an app is set to paid, you **cannot** change it to free later (Google policy). You can lower the price or run sales, but not go free.
+- Consider starting at $0.99–$2.99 for a utility app.
