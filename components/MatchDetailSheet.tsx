@@ -217,7 +217,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    // RN 0.86 removed absoluteFillObject; absoluteFill is now the plain object.
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   sheet: {
