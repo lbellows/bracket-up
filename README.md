@@ -11,6 +11,27 @@ npx expo start
 
 Then press `a` to open the Android emulator, or scan the QR code with Expo Go.
 
+## Checks
+
+```bash
+npm test        # jest — bracket engine behaviour
+npm run typecheck
+```
+
+The bracket engine's failure mode is silent: a bug in bye propagation can
+auto-resolve a real match, eliminating a player who never got to play, without
+anything throwing. `utils/__tests__/bracketEngine.test.ts` guards against this by
+playing thousands of randomised tournaments (every field size from 3 to 32, with
+seeded RNG so failures reproduce) and asserting end-state invariants:
+
+- exactly one champion, holding at most one loss
+- placements form a contiguous `1..N`
+- everyone below the top two leaves with exactly two losses and an `eliminated` flag
+- no match is flagged a bye while holding two real participants
+- every W/L record matches the completed match list
+
+Run the suite after any change to `bracketGenerator.ts` or `doubleElimLogic.ts`.
+
 ## EAS Android build
 
 ```bash
@@ -44,7 +65,7 @@ hooks/
 utils/
   bracketGenerator.ts       Generates the full bracket match graph for N players
   doubleElimLogic.ts        Stateless result-recording and bracket advancement
-  exportUtils.ts            JSON / plain-text export via expo-sharing
+  exportUtils.ts            Markdown export via expo-sharing / clipboard
 
 types/
   tournament.ts             All TypeScript interfaces (Tournament, Match, Participant…)
@@ -96,9 +117,13 @@ All tournaments are stored as a JSON array in AsyncStorage under the key `@brack
 
 ## Export
 
-The **Export** button (top-right on the Bracket screen) offers:
-- **JSON** — Full tournament object written to the device cache, then shared via the OS share sheet.
-- **Text summary** — Human-readable standings + match history, also shared via the OS share sheet.
+The **Export** button (top-right on the Bracket screen, and at the foot of the
+Results screen) produces a Markdown summary — final standings plus full match
+history.
+
+- **Native** — written to the app cache directory, then handed to the OS share sheet.
+- **Web** — copied to the clipboard, falling back to a `.md` file download when
+  the Clipboard API is unavailable.
 
 ## Asset placeholders
 

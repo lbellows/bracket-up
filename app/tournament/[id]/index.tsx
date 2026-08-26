@@ -13,7 +13,6 @@ import React, { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -25,7 +24,7 @@ import MatchDetailSheet from '../../../components/MatchDetailSheet';
 import { useBracketEngine } from '../../../hooks/useBracketEngine';
 import { useTournament } from '../../../hooks/useTournament';
 import { Match } from '../../../types/tournament';
-import { exportTournamentMarkdown } from '../../../utils/exportUtils';
+import { canUseClipboard, exportTournamentMarkdown } from '../../../utils/exportUtils';
 
 export default function BracketScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -74,7 +73,7 @@ export default function BracketScreen() {
     if (!tournament) return;
     exportTournamentMarkdown(tournament)
       .then(() => {
-        if (Platform.OS === 'web' && navigator.clipboard?.writeText) {
+        if (canUseClipboard()) {
           setExportLabel('Copied!');
           setTimeout(() => setExportLabel('Export'), 2000);
         }

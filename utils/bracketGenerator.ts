@@ -270,7 +270,11 @@ export function propagateByes(
       // Propagate winner into next match slot
       if (m.winnerNextMatchId && m.winnerId) {
         const next = mm.get(m.winnerNextMatchId)!;
-        if (m.winnerNextSlot === 'p1' && next.p1Id !== m.winnerId) {
+        // Never write into a match that has already resolved — doing so strands
+        // the participant in a completed match they will never get to play.
+        if (next.status === 'complete') {
+          // already resolved
+        } else if (m.winnerNextSlot === 'p1' && next.p1Id !== m.winnerId) {
           next.p1Id = m.winnerId;
           changed = true;
         } else if (m.winnerNextSlot === 'p2' && next.p2Id !== m.winnerId) {
@@ -282,7 +286,9 @@ export function propagateByes(
       // Propagate loser into LB slot (skip if bye — no real loser)
       if (m.loserNextMatchId && m.loserId) {
         const next = mm.get(m.loserNextMatchId)!;
-        if (m.loserNextSlot === 'p1' && next.p1Id !== m.loserId) {
+        if (next.status === 'complete') {
+          // already resolved
+        } else if (m.loserNextSlot === 'p1' && next.p1Id !== m.loserId) {
           next.p1Id = m.loserId;
           changed = true;
         } else if (m.loserNextSlot === 'p2' && next.p2Id !== m.loserId) {
@@ -332,14 +338,23 @@ export function propagateByes(
 }
 
 /**
- * Returns true if at least one incomplete match will eventually place a
- * participant into the given slot of matchId.
+ * Returns true if some match will eventually place a participant into the given
+ * slot of matchId.
+ *
+ * A *completed* feeder still counts when it produced a real participant for that
+ * edge: the bye-resolution pass marks matches complete one at a time, so a feeder
+ * can already be complete while its winner is still waiting to be propagated on
+ * the next iteration. Treating those as "will never fill" would wrongly void the
+ * downstream match and eliminate a player who never got to play.
  */
 function canSlotBeFilled(matchId: string, slot: MatchSlot, allMatches: Match[]): boolean {
   for (const m of allMatches) {
-    if (m.status === 'complete') continue;
-    if (m.winnerNextMatchId === matchId && m.winnerNextSlot === slot) return true;
-    if (m.loserNextMatchId === matchId && m.loserNextSlot === slot) return true;
+    if (m.winnerNextMatchId === matchId && m.winnerNextSlot === slot) {
+      if (m.status !== 'complete' || m.winnerId) return true;
+    }
+    if (m.loserNextMatchId === matchId && m.loserNextSlot === slot) {
+      if (m.status !== 'complete' || m.loserId) return true;
+    }
   }
   return false;
 }

@@ -12,6 +12,19 @@ import { Tournament } from '../types/tournament';
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+/**
+ * True when the export will take the web clipboard path (and callers should show
+ * a "Copied!" confirmation rather than relying on the OS share sheet).
+ * The Clipboard API is absent outside secure contexts, so this is a runtime check.
+ */
+export function canUseClipboard(): boolean {
+  return (
+    Platform.OS === 'web' &&
+    typeof navigator !== 'undefined' &&
+    navigator.clipboard != null
+  );
+}
+
 export async function exportTournamentMarkdown(tournament: Tournament): Promise<void> {
   const md = buildMarkdown(tournament);
   const fileName = `${sanitiseFilename(tournament.name)}_${shortDate(tournament.createdAt)}.md`;
@@ -98,24 +111,27 @@ function buildMarkdown(tournament: Tournament): string {
 
 async function nativeExport(md: string, fileName: string): Promise<void> {
   // Dynamic imports keep web bundles free of native-only modules.
-  const [FileSystem, Sharing] = await Promise.all([
+  const [{ File, Paths }, Sharing] = await Promise.all([
     import('expo-file-system'),
     import('expo-sharing'),
   ]);
 
-  const uri = FileSystem.cacheDirectory + fileName;
-  await FileSystem.writeAsStringAsync(uri, md, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
-
   const available = await Sharing.isAvailableAsync();
   if (!available) throw new Error('Sharing is not available on this device');
-  await Sharing.shareAsync(uri, { mimeType: 'text/markdown', UTI: 'net.daringfireball.markdown' });
+
+  const file = new File(Paths.cache, fileName);
+  file.create({ overwrite: true });
+  file.write(md);
+
+  await Sharing.shareAsync(file.uri, {
+    mimeType: 'text/markdown',
+    UTI: 'net.daringfireball.markdown',
+  });
 }
 
 async function webExport(md: string, fileName: string): Promise<void> {
   // Try clipboard first; fall back to file download.
-  if (navigator.clipboard?.writeText) {
+  if (canUseClipboard()) {
     await navigator.clipboard.writeText(md);
     return; // caller can show "Copied to clipboard" toast
   }

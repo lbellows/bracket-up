@@ -11,7 +11,6 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   SectionList,
   StyleSheet,
   Text,
@@ -21,13 +20,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTournament } from '../../../hooks/useTournament';
 import { Match, Participant, Tournament } from '../../../types/tournament';
-import { exportTournamentMarkdown } from '../../../utils/exportUtils';
+import { canUseClipboard, exportTournamentMarkdown } from '../../../utils/exportUtils';
 
 const PLACEMENT_MEDALS: Record<number, string> = {
   1: '🥇',
   2: '🥈',
   3: '🥉',
 };
+
+/** The two heterogeneous sections rendered by the results SectionList. */
+type ResultsSection =
+  | { title: 'Standings'; data: Participant[] }
+  | { title: 'Match History'; data: Match[] };
 
 export default function ResultsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -39,7 +43,7 @@ export default function ResultsScreen() {
     exportTournamentMarkdown(tournament)
       .then(() => {
         // On web the clipboard path returns without throwing — show brief confirmation.
-        if (Platform.OS === 'web' && navigator.clipboard?.writeText) {
+        if (canUseClipboard()) {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         }
@@ -57,7 +61,7 @@ export default function ResultsScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <SectionList
+      <SectionList<Participant | Match, ResultsSection>
         contentContainerStyle={styles.list}
         sections={buildSections(tournament)}
         keyExtractor={(item, idx) => String(idx)}
@@ -85,7 +89,7 @@ export default function ResultsScreen() {
 
 // ─── Section builder ──────────────────────────────────────────────────────────
 
-function buildSections(tournament: Tournament) {
+function buildSections(tournament: Tournament): ResultsSection[] {
   const participantMap = new Map(tournament.participants.map((p) => [p.id, p]));
 
   const placed = tournament.participants

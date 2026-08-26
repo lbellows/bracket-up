@@ -106,8 +106,8 @@ export function recordResult(
  * downstream matches and the new ones are placed in their slots. Downstream
  * matches that are already complete are left untouched.
  *
- * Grand-final re-scoring updates scores and W/L counts but does not
- * re-evaluate tournament completion or the GF-reset branch.
+ * Grand-final matches are handed to `rescoreGrandFinal`, which re-evaluates
+ * tournament completion, the reset branch, and final placements.
  */
 export function rescoreMatch(
   tournament: Tournament,
@@ -167,6 +167,12 @@ export function rescoreMatch(
     }
   }
 
+  // Grand-final results decide the title, so rescoring one has to re-evaluate
+  // tournament completion and the reset branch rather than just moving players on.
+  if (match.bracket === 'grand-final') {
+    return rescoreGrandFinal(tournament, match, matchMap, participantMap);
+  }
+
   if (winnerChanged) {
     placeInNextMatch(match, 'winner', matchMap);
     placeInNextMatch(match, 'loser', matchMap);
@@ -180,6 +186,118 @@ export function rescoreMatch(
     matches: updatedMatches,
     participants: Array.from(participantMap.values()),
   };
+}
+
+/**
+ * Re-applies the grand-final rules after a grand-final match has been rescored.
+ *
+ * Flipping game 1 changes whether a reset is played at all, so this has to be
+ * able to move the tournament in both directions:
+ *   - WB champion now wins game 1 → the reset is discarded and the title stands.
+ *   - LB champion now wins game 1 → the reset is (re)armed and play resumes.
+ *
+ * Placements are always recomputed from scratch, since a different finalist
+ * cascades into the 3rd-and-below ordering too.
+ */
+function rescoreGrandFinal(
+  tournament: Tournament,
+  match: Match,
+  matchMap: Map<string, Match>,
+  participantMap: Map<string, Participant>,
+): Tournament {
+  const base = {
+    ...tournament,
+    matches: Array.from(matchMap.values()),
+    participants: Array.from(participantMap.values()),
+  };
+
+  for (const p of participantMap.values()) p.placement = null;
+
+  // ── Rescoring the reset itself: it decides the title outright. ─────────────
+  if (match.round === 2) {
+    if (match.winnerId) setPlacement(participantMap, match.winnerId, 1);
+    if (match.loserId) setPlacement(participantMap, match.loserId, 2);
+    return finaliseTournament(
+      { ...base, needsGrandFinalReset: true },
+      matchMap,
+      participantMap,
+    );
+  }
+
+  // ── Rescoring game 1. ──────────────────────────────────────────────────────
+  const gf1 = findGrandFinalMatch(matchMap, 1);
+  const gf2 = findGrandFinalMatch(matchMap, 2);
+
+  const wbChampionId = gf1?.p1Id ?? null; // WB champion always enters as p1
+  const lbChampionId = gf1?.p2Id ?? null;
+  const gf1LoserId = gf1?.loserId ?? null;
+
+  if (gf1?.winnerId === wbChampionId && wbChampionId !== lbChampionId) {
+    // WB champion takes it in game 1 — no reset is played.
+    if (gf2) discardResetMatch(gf2, participantMap);
+    if (wbChampionId) setPlacement(participantMap, wbChampionId, 1);
+    if (gf1LoserId) setPlacement(participantMap, gf1LoserId, 2);
+    return finaliseTournament(
+      { ...base, needsGrandFinalReset: false },
+      matchMap,
+      participantMap,
+    );
+  }
+
+  // LB champion takes game 1 — both finalists now hold one loss, so the reset
+  // must be played (and replayed, if it had already been recorded).
+  if (gf2) {
+    discardResetMatch(gf2, participantMap);
+    gf2.p1Id = wbChampionId;
+    gf2.p2Id = lbChampionId;
+  }
+
+  return {
+    ...base,
+    status: 'active',
+    needsGrandFinalReset: true,
+    matches: Array.from(matchMap.values()),
+    participants: Array.from(participantMap.values()),
+  };
+}
+
+function findGrandFinalMatch(
+  matchMap: Map<string, Match>,
+  round: 1 | 2,
+): Match | undefined {
+  return Array.from(matchMap.values()).find(
+    (m) => m.bracket === 'grand-final' && m.round === round,
+  );
+}
+
+/**
+ * Returns the reset match to its dormant, never-played state — reversing its
+ * win/loss record first if it had already been recorded, so discarding it does
+ * not leave the finalists carrying a phantom result.
+ */
+function discardResetMatch(
+  gf2: Match,
+  participantMap: Map<string, Participant>,
+): void {
+  if (gf2.status === 'complete') {
+    if (gf2.winnerId) {
+      const winner = participantMap.get(gf2.winnerId);
+      if (winner) winner.wins = Math.max(0, winner.wins - 1);
+    }
+    if (gf2.loserId) {
+      const loser = participantMap.get(gf2.loserId);
+      if (loser) loser.losses = Math.max(0, loser.losses - 1);
+    }
+  }
+
+  gf2.p1Id = null;
+  gf2.p2Id = null;
+  gf2.p1Score = 0;
+  gf2.p2Score = 0;
+  gf2.winnerId = null;
+  gf2.loserId = null;
+  gf2.status = 'pending';
+  gf2.isBye = false;
 }
 
 function removeFromPendingSlot(
@@ -216,9 +334,7 @@ function handleGrandFinal1(
 
   // LB champion wins GF1 → bracket reset, play GF2
   // Find or activate GF2 match
-  const gf2 = Array.from(matchMap.values()).find(
-    (m) => m.bracket === 'grand-final' && m.round === 2,
-  );
+  const gf2 = findGrandFinalMatch(matchMap, 2);
   if (gf2) {
     gf2.p1Id = wbChampionId; // same participants
     gf2.p2Id = lbChampionId;

@@ -23,6 +23,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0f172a"
       },
+      "versionCode": 1,
       "package": "com.bracketup.app"
     },
     "web": {
