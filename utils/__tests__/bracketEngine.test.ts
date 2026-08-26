@@ -214,6 +214,100 @@ describe('full tournament playthroughs', () => {
   });
 });
 
+// ─── Exhaustive small fields ─────────────────────────────────────────────────
+//
+// For the smallest brackets every possible sequence of results is cheap to walk,
+// which beats random sampling: it proves there is no losing path at all.
+
+describe('exhaustive outcomes', () => {
+  /** Walks every combination of match results, calling back on each finished bracket. */
+  function exploreAll(t: Tournament, visit: (finished: Tournament) => void, depth = 0): void {
+    if (depth > 40) throw new Error('exploration ran too deep — bracket is not converging');
+
+    if (t.status === 'complete') {
+      visit(t);
+      return;
+    }
+
+    const available = getAvailableMatches(t);
+    if (available.length === 0) {
+      throw new Error(`Deadlock: status "${t.status}" with no available matches`);
+    }
+
+    const match = available[0];
+    for (const winnerId of [match.p1Id!, match.p2Id!]) {
+      const isP1 = winnerId === match.p1Id;
+      exploreAll(recordResult(t, match.id, winnerId, isP1 ? 2 : 0, isP1 ? 0 : 2), visit, depth + 1);
+    }
+  }
+
+  it.each([2, 3, 4])('holds for every possible outcome with %i participants', (n) => {
+    let finished = 0;
+
+    exploreAll(makeTournament(n), (t) => {
+      finished++;
+      assertTournamentInvariants(t, n, 0);
+    });
+
+    expect(finished).toBeGreaterThan(0);
+  });
+
+  /**
+   * Two players is the degenerate bracket: one match, then the grand final.
+   * With no losers bracket to run, the loser of that match is the losers-bracket
+   * champion by default. That edge was previously unwired, so the grand final
+   * could never fill its second slot and the tournament deadlocked forever.
+   */
+  it('completes a two-player bracket instead of deadlocking', () => {
+    let finished = 0;
+
+    exploreAll(makeTournament(2), (t) => {
+      finished++;
+      const champion = t.participants.find((p) => p.placement === 1)!;
+      const runnerUp = t.participants.find((p) => p.placement === 2)!;
+
+      expect(champion.losses).toBeLessThanOrEqual(1);
+      expect(runnerUp.losses).toBe(2); // double elimination: you leave on two
+    });
+
+    // Win outright (2 paths) or drop game 1 and take the reset (4 paths).
+    expect(finished).toBe(6);
+  });
+});
+
+// ─── Persistence ─────────────────────────────────────────────────────────────
+
+describe('storage round-trip', () => {
+  // Tournaments are persisted to AsyncStorage as JSON, so anything that does not
+  // survive JSON.stringify/parse is silently lost between app launches.
+  it('survives serialisation mid-tournament and can still be finished', () => {
+    let t = makeTournament(9);
+    const rng = makeRng(4);
+
+    for (let i = 0; i < 12; i++) {
+      const available = getAvailableMatches(t);
+      if (available.length === 0) break;
+      const m = available[Math.floor(rng() * available.length)];
+      const p1Wins = rng() < 0.5;
+      t = recordResult(t, m.id, (p1Wins ? m.p1Id : m.p2Id)!, p1Wins ? 2 : 0, p1Wins ? 0 : 2);
+    }
+
+    const revived = JSON.parse(JSON.stringify(t)) as Tournament;
+    expect(revived).toEqual(t);
+
+    // And the revived copy is still a working bracket.
+    let finished = revived;
+    for (let guard = 0; guard < 500 && finished.status !== 'complete'; guard++) {
+      const available = getAvailableMatches(finished);
+      if (available.length === 0) break;
+      const m = available[0];
+      finished = recordResult(finished, m.id, m.p1Id!, 2, 0);
+    }
+
+    assertTournamentInvariants(finished, 9, 4);
+  });
+});
+
 // ─── Regression: bye propagation ─────────────────────────────────────────────
 
 describe('bye propagation (regression)', () => {
@@ -449,6 +543,22 @@ describe('rescoreMatch', () => {
     const clearedReset = settled.matches.find((m) => m.bracket === 'grand-final' && m.round === 2)!;
     expect(clearedReset.status).toBe('pending');
     expect(clearedReset.winnerId).toBeNull();
+  });
+
+  it('can play the reset through after a rescore re-opens the tournament', () => {
+    // Re-opening is only useful if play can actually resume: the reset has to
+    // show up as available and carry the bracket back to a valid finish.
+    const { tournament, gf1 } = playThroughGameOne(11, true);
+    const reopened = rescoreMatch(tournament, gf1.id, gf1.p2Id!, 1, 3);
+
+    const available = getAvailableMatches(reopened);
+    expect(available.map((m) => `${m.bracket} R${m.round}`)).toEqual(['grand-final R2']);
+
+    const reset = available[0];
+    const finished = recordResult(reopened, reset.id, reset.p2Id!, 1, 3);
+
+    expect(finished.status).toBe('complete');
+    assertTournamentInvariants(finished, 8, 11);
   });
 
   it('swaps the title when the reset itself is rescored', () => {

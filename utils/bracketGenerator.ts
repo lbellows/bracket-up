@@ -200,9 +200,13 @@ export function generateDoubleElimBracket(participants: Participant[]): Match[] 
     makeMatch('grand-final', 2, 0);
     // Note: gf2 routing is wired dynamically in doubleElimLogic after GF1 resolves.
   } else {
-    // p === 2: degenerate case — just a grand final, no LB
+    // p === 2: degenerate case — a single match, then the grand final.
+    // With no losers bracket to run, the loser of that match is the LB champion
+    // by default and goes straight into the grand final. Without wiring that
+    // edge the GF can never fill its second slot and the bracket deadlocks.
     const gf1 = makeMatch('grand-final', 1, 0);
     wire(wbFinals, 'winner', gf1, 'p1');
+    wire(wbFinals, 'loser', gf1, 'p2');
     // GF Reset slot
     makeMatch('grand-final', 2, 0);
   }

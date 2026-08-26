@@ -38,7 +38,8 @@ export async function exportTournamentMarkdown(tournament: Tournament): Promise<
 
 // ─── Markdown builder ─────────────────────────────────────────────────────────
 
-function buildMarkdown(tournament: Tournament): string {
+/** Exported for testing; callers should use `exportTournamentMarkdown`. */
+export function buildMarkdown(tournament: Tournament): string {
   const lines: string[] = [];
   const pMap = new Map(tournament.participants.map((p) => [p.id, p]));
 
