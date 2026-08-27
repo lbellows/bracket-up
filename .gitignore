@@ -11,3 +11,6 @@ dist/
 *.orig.*
 web-build/
 builds/
+# Google Play service account keys — never commit these
+*service-account*.json
+api-*.json
