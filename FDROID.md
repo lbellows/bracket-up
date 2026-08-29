@@ -54,7 +54,12 @@ in this repo, so the description, screenshots and changelogs are already in plac
   everything except publish — that is the way to check a build before tagging.
 - `fdroid/com.bracketup.app.yml` is the recipe to submit to fdroiddata. It has one
   build entry per architecture, each pinned to a single ABI with
-  `-PreactNativeArchitectures=`.
+  `gradleprops: reactNativeArchitectures=<abi>`. It is kept in fdroid's canonical
+  format — the exact output of `fdroid rewritemeta` — so it can be copied into a
+  fdroiddata fork verbatim. fdroiddata's CI runs `fdroid rewritemeta` on every
+  changed file and fails the merge request if the file changes, and that rewrite
+  strips YAML comments, which is why the recipe carries no comments and the
+  rationale a reviewer needs lives in its `MaintainerNotes` instead.
 - Version numbers live in `app.json` (`expo.version` and `expo.android.versionCode`).
   EAS was removed entirely (`eas.json` and the `extra.eas` project binding), so the
   repo is the single source of truth — F-Droid reads the version from source and
@@ -262,14 +267,35 @@ within a day — and you do not file anything again. Users install by adding
    `VercodeOperation` (`10 * %c + 1/2/3`) tells the auto-updater to copy all
    three entries on a new tag and assign each the code that ABI's APK declares.
    The entries must stay in ascending-offset order for that mapping to hold.
-3. Test the recipe if you can — it needs Docker and a lot of disk:
-
-   ```bash
-   fdroid build -v -l com.bracketup.app
-   ```
+3. Let fdroiddata's CI build it. The merge request runs `fdroid build` on
+   F-Droid's own buildserver image, which is the verification that counts —
+   building locally means reproducing that environment by hand, and a local pass
+   would not prove anything the CI run does not.
 
 4. Open a merge request. Review is slow and reviewers do ask questions; the common
    ones for this app are answered in the recipe's `MaintainerNotes`.
+
+Before opening the merge request, run the two checks fdroiddata's CI runs — both
+work on an ordinary machine, no Docker or Android SDK needed for the first:
+
+```bash
+# in a fdroiddata checkout, with the recipe copied to metadata/
+fdroid lint -f com.bracketup.app        # metadata + canonical formatting
+fdroid rewritemeta com.bracketup.app    # must leave the file unchanged
+
+# the scan Izzy and fdroiddata both run over the built APKs
+fdroid scanner -r -e BracketUp-<version>-arm64-v8a.apk
+
+# the source-tree scan; clones the tag and runs `npm ci`, needs no Android SDK
+fdroid scanner -e com.bracketup.app:<versionCode>
+```
+
+`fdroid scanner` needs `dexdump` from the Android SDK build-tools to scan an APK;
+unpacking `build-tools_r36.1_linux.zip` from
+<https://dl.google.com/android/repository/> into `$ANDROID_HOME/build-tools/36.1.0`
+is enough, and does not require a JDK. Note that `fdroid lint` run outside a
+fdroiddata checkout wrongly reports the category as invalid — it reads the valid
+list from that repo's `config/categories.yml` and finds nothing without it.
 
 Things a reviewer may raise, and where they stand here:
 
@@ -286,6 +312,65 @@ Things a reviewer may raise, and where they stand here:
 - **Why `android/` is committed.** So the buildserver does not have to run
   `expo prebuild` (which fetches templates at build time). CI proves the committed
   project matches `app.json`.
+
+### Known blocker: the Java 17 toolchain
+
+The recipe has not yet built on F-Droid's buildserver, and the reason is not
+something the recipe can currently express.
+
+React Native's Gradle plugin (`JdkConfiguratorUtils`) applies
+`kotlin { jvmToolchain(17) }` and `sourceCompatibility/targetCompatibility =
+VERSION_17` to *every* module in the build, and `expo-modules-core` sets
+`kotlin.jvmToolchain(17)` for KSP as well. Gradle matches a toolchain version
+exactly. The buildserver installs `default-jdk-headless` and nothing else, which
+on Debian trixie is JDK 21 — and trixie has no `openjdk-17` package at all, only
+21 and 25. So the build fails at `:app:compileReleaseJavaWithJavac` with:
+
+```
+Cannot find a Java installation on your machine matching:
+{languageVersion=17, ...}. Toolchain auto-provisioning is not enabled.
+```
+
+Three ways out, none yet chosen:
+
+- **Fetch a pinned JDK 17 in the `sudo:` block**, the way the recipe already
+  fetches Node. Verified to work — it produces the APK. The cost is a ~193 MB
+  binary download that a reviewer has to accept. Worth saying in the merge
+  request: this is not a workaround invented for F-Droid. The `build` and
+  `smoke-test` jobs in `.github/workflows/release.yml` both run
+  `actions/setup-java` with `distribution: temurin, java-version: 17`, so every
+  APK on the GitHub Releases page — including the ones IzzyOnDroid serves — is
+  already built with Temurin 17. Pinning it in the recipe only makes the
+  buildserver match how the app is built everywhere else.
+- **Set `react.internal.disableJavaVersionAlignment`.** React Native checks this
+  property and skips all of the above. It is a documented escape hatch, but it
+  sets no replacement target, so `android/app/build.gradle` would need explicit
+  `compileOptions` and a Kotlin `jvmTarget` to avoid an inconsistent-JVM-target
+  failure, and it does not cover `expo-modules-core`'s KSP toolchain.
+- **Wait for the toolchain requirement to move.** It is upstream React Native's
+  choice, not this app's; when RN aligns on 21 the problem disappears.
+
+Worth raising in the merge request rather than guessing — F-Droid reviewers deal
+with this class of problem across every React Native app in the repo and will
+have a preference.
+
+### Testing the recipe remotely
+
+`.github/workflows/fdroid-build.yml` runs `fdroid build` inside F-Droid's own
+buildserver image on a GitHub runner — the same thing fdroiddata's CI does, so
+the recipe can be checked without reproducing that environment locally. It is
+`workflow_dispatch` only:
+
+```bash
+gh workflow run "F-Droid recipe build"                      # arm64-v8a, JDK 17 provisioned
+gh workflow run "F-Droid recipe build" -f versioncode=21    # a different ABI
+gh workflow run "F-Droid recipe build" -f provision_jdk17=false   # reproduce the blocker
+```
+
+It builds from the tag named in the recipe's `commit:`, not from the branch you
+dispatch it on, and uploads the APK and fdroid's build logs as artifacts.
+Leaving `provision_jdk17` on verifies everything else in the recipe end to end;
+turning it off reproduces exactly what F-Droid's buildserver does today.
 
 ---
 
