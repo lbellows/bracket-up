@@ -1,11 +1,5 @@
-# F-Droid build recipe for BracketUp.
-#
-# This file is not used by this repository — it is the metadata to submit to
-# https://gitlab.com/fdroid/fdroiddata as metadata/com.bracketup.app.yml.
-# It is kept here so the recipe is versioned alongside the code it builds.
-# See FDROID.md for the submission procedure.
-
 Categories:
+  - Game Helper
   - Sports & Health
 License: MIT
 AuthorName: LCB
@@ -19,88 +13,71 @@ RepoType: git
 Repo: https://github.com/lbellows/bracket-up.git
 
 Builds:
-  # One build per architecture. The Gradle build splits the APK by ABI, and
-  # `reactNativeArchitectures` narrows each run to a single one so every build
-  # here produces exactly one APK. Each APK's versionCode is
-  # `expo.android.versionCode * 10 + <abi offset>` (armeabi-v7a 1, arm64-v8a 2,
-  # x86_64 3), assigned in plugins/withAbiSplits.js.
   - versionName: 1.0.1
     versionCode: 21
     commit: v1.0.1
     subdir: android/app
-    gradleprops:
-      - reactNativeArchitectures=armeabi-v7a
     sudo:
-      - curl -Lo node.tar.xz https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.xz
-      - echo "d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307  node.tar.xz" | sha256sum -c -
-      - tar xf node.tar.xz --directory=/opt
+      - curl -Lo node.tar.gz https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.gz
+      - echo "b294a556e639d64338823920e5866c21c02741742d2e1529ee1a225c1ec9252a  node.tar.gz"
+        | sha256sum -c -
+      - tar xzf node.tar.gz --directory=/opt
       - mv /opt/node-v22.23.2-linux-x64 /opt/node
       - ln -s /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
-    init:
-      - npm ci
+    init: npm ci
     gradle:
       - yes
     rm:
       - .github
       - store-assets
     scanignore:
-      # React Native ships prebuilt tooling (hermesc, the Gradle plugin's jars)
-      # inside node_modules. These are build-time only and are not packaged into
-      # the APK; the shipped native libraries are compiled from the Maven-hosted
-      # React Native and Hermes sources during the Gradle build.
       - node_modules
+    gradleprops:
+      - reactNativeArchitectures=armeabi-v7a
 
   - versionName: 1.0.1
     versionCode: 22
     commit: v1.0.1
     subdir: android/app
-    gradleprops:
-      - reactNativeArchitectures=arm64-v8a
     sudo:
-      - curl -Lo node.tar.xz https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.xz
-      - echo "d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307  node.tar.xz" | sha256sum -c -
-      - tar xf node.tar.xz --directory=/opt
+      - curl -Lo node.tar.gz https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.gz
+      - echo "b294a556e639d64338823920e5866c21c02741742d2e1529ee1a225c1ec9252a  node.tar.gz"
+        | sha256sum -c -
+      - tar xzf node.tar.gz --directory=/opt
       - mv /opt/node-v22.23.2-linux-x64 /opt/node
       - ln -s /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
-    init:
-      - npm ci
+    init: npm ci
     gradle:
       - yes
     rm:
       - .github
       - store-assets
     scanignore:
-      # React Native ships prebuilt tooling (hermesc, the Gradle plugin's jars)
-      # inside node_modules. These are build-time only and are not packaged into
-      # the APK; the shipped native libraries are compiled from the Maven-hosted
-      # React Native and Hermes sources during the Gradle build.
       - node_modules
+    gradleprops:
+      - reactNativeArchitectures=arm64-v8a
 
   - versionName: 1.0.1
     versionCode: 23
     commit: v1.0.1
     subdir: android/app
-    gradleprops:
-      - reactNativeArchitectures=x86_64
     sudo:
-      - curl -Lo node.tar.xz https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.xz
-      - echo "d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307  node.tar.xz" | sha256sum -c -
-      - tar xf node.tar.xz --directory=/opt
+      - curl -Lo node.tar.gz https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.gz
+      - echo "b294a556e639d64338823920e5866c21c02741742d2e1529ee1a225c1ec9252a  node.tar.gz"
+        | sha256sum -c -
+      - tar xzf node.tar.gz --directory=/opt
       - mv /opt/node-v22.23.2-linux-x64 /opt/node
       - ln -s /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
-    init:
-      - npm ci
+    init: npm ci
     gradle:
       - yes
     rm:
       - .github
       - store-assets
     scanignore:
-      # React Native ships prebuilt tooling (hermesc, the Gradle plugin's jars)
-      # inside node_modules. These are build-time only and are not packaged into
-      # the APK; the shipped native libraries are compiled from the Maven-hosted
-      # React Native and Hermes sources during the Gradle build.
       - node_modules
+    gradleprops:
+      - reactNativeArchitectures=x86_64
 
 MaintainerNotes: |-
   Expo (React Native) app. The native android/ project is committed to the
@@ -108,9 +85,19 @@ MaintainerNotes: |-
   it drifts from app.json, so the checked-in project always matches the config.
 
   Every release has three builds, one per ABI, because a universal APK is ~97 MB.
-  VercodeOperation reproduces the versionCode scheme, so the auto-updater copies
-  all three entries on a new tag and gives each the right code — the build blocks
-  are ordered to match the operations, ascending.
+  The Gradle build splits the APK by ABI and `reactNativeArchitectures` narrows
+  each build entry to a single one, so every entry here produces exactly one APK,
+  whose versionCode is `expo.android.versionCode * 10 + <abi offset>`
+  (armeabi-v7a 1, arm64-v8a 2, x86_64 3), assigned in plugins/withAbiSplits.js.
+  VercodeOperation reproduces that scheme, so the auto-updater copies all three
+  entries on a new tag and gives each the right code — the build blocks are
+  ordered to match the operations, ascending.
+
+  `scanignore: node_modules` covers the prebuilt tooling React Native ships
+  inside node_modules (hermesc, the Gradle plugin's jars) and the local Maven
+  repos a few Expo modules carry. All of it is build-time only and none of it is
+  packaged into the APK; the native libraries that are shipped are compiled
+  during the Gradle build from the Maven-hosted React Native and Hermes sources.
 
   `gradle assembleRelease` produces an unsigned APK here: the release signing
   config activates only when a keystore is supplied via environment variables,
