@@ -30,9 +30,25 @@ in this repo, so the description, screenshots and changelogs are already in plac
   unsigned — which is exactly what F-Droid wants, since it signs with its own key —
   rather than falling back to the debug key. That means **no keystore of any kind is
   committed to this repository**, not even the public Android debug key.
-- `.github/workflows/release.yml` builds a signed universal APK on any `v*` tag,
-  verifies it declares no permissions, and attaches it to a GitHub Release.
-- `fdroid/com.bracketup.app.yml` is the recipe to submit to fdroiddata.
+- The release build is **split per CPU architecture** and **minified**
+  (`plugins/withAbiSplits.js`, `plugins/withMinifiedRelease.js`). This is not
+  cosmetic: IzzyOnDroid's hard limit is 30 MB for a single APK, and the universal
+  unminified APK was 97 MB — 72 MB of native libraries for four architectures of
+  which a device runs one, plus 38 MB of unminified dex. 32-bit x86 is dropped
+  altogether; nothing but old emulators uses it.
+- Each per-ABI APK gets its own versionCode, `versionCode * 10 + <abi offset>`
+  (armeabi-v7a 1, arm64-v8a 2, x86_64 3), because F-Droid and IzzyOnDroid index
+  APKs by versionCode and three APKs sharing one would collide. So versionCode 2
+  in `app.json` ships as APKs 21, 22 and 23.
+- `.github/workflows/release.yml` builds the three signed APKs on any `v*` tag,
+  checks each one is single-ABI, permission-free, signed with the release key and
+  under 30 MB, installs the minified x86_64 APK on an emulator and asserts the app
+  renders (`scripts/smoke-test-apk.sh`), and only then attaches them to a GitHub
+  Release. Running it by hand (`gh workflow run "Release APK" --ref <branch>`) does
+  everything except publish — that is the way to check a build before tagging.
+- `fdroid/com.bracketup.app.yml` is the recipe to submit to fdroiddata. It has one
+  build entry per architecture, each pinned to a single ABI with
+  `-PreactNativeArchitectures=`.
 - Version numbers live in `app.json` (`expo.version` and `expo.android.versionCode`).
   EAS was removed entirely (`eas.json` and the `extra.eas` project binding), so the
   repo is the single source of truth — F-Droid reads the version from source and
@@ -151,10 +167,26 @@ sdkmanager "platform-tools" "build-tools;35.0.0" "platforms;android-35" \
 
 3. Write the changelog at `fastlane/metadata/android/en-US/changelogs/<versionCode>.txt`
    — so `changelogs/2.txt` for versionCode 2. The filename is the versionCode, not
-   the version name. `prebuild:check` fails if it is missing, because a mismatch
-   otherwise just shows up as an empty changelog on both stores.
+   the version name. Then copy it to the versionCode of each per-ABI APK:
 
-4. Commit, tag, push:
+   ```bash
+   npm run changelogs
+   ```
+
+   `prebuild:check` fails if any of them is missing or out of date, because a
+   mismatch otherwise just shows up as an empty changelog on both stores.
+
+4. Optionally dry-run the whole release without publishing anything:
+
+   ```bash
+   git push origin HEAD:refs/heads/release-check
+   gh workflow run "Release APK" --ref release-check
+   ```
+
+   This builds, runs every check including the emulator smoke test, and uploads
+   the APKs as workflow artifacts. Only a `v*` tag publishes a Release.
+
+5. Commit, tag, push:
 
    ```bash
    git commit -am "release: 1.0.1"
@@ -162,23 +194,46 @@ sdkmanager "platform-tools" "build-tools;35.0.0" "platforms;android-35" \
    git push origin main --tags
    ```
 
-The release workflow builds, verifies and publishes the APK to GitHub Releases.
+The release workflow builds, verifies and publishes the three APKs to GitHub
+Releases.
 
 ---
 
 ## Submitting to IzzyOnDroid
 
-Once your first tagged release with an attached APK exists:
+The tracker moved. The old GitLab repo is archived and read-only; inclusion
+requests now go to Codeberg:
 
-1. Open an issue at <https://gitlab.com/IzzyOnDroid/repo/-/issues> using the
-   "Inclusion request" template.
-2. Give it the repo URL `https://github.com/lbellows/bracket-up` and the package
-   name `com.bracketup.app`.
-3. Izzy's scanner checks the APK for tracking libraries and non-free blobs. There
-   are none, so this should pass without changes.
+- Issues: <https://codeberg.org/IzzyOnDroid/repo/issues> ("Inclusion request")
+- Policy: <https://izzyondroid.org/docs/general/AppInclusionPolicy/>
 
-After inclusion, every new GitHub Release is picked up automatically — you do not
-file anything again. Users install by adding
+Where this app stands against the policy:
+
+| Requirement | BracketUp |
+|---|---|
+| OSI/FSF-approved license, no proprietary components | MIT; no Play Services, no closed dependency |
+| No ads, analytics or other trackers | none — the app makes no network requests at all |
+| APK on a tagged release, signed with a release key | GitHub Releases, signed by `.github/workflows/release.yml` |
+| Not debuggable, not testOnly | release build type |
+| 30 MB per APK, hard limit | checked in CI for every APK |
+| Fastlane metadata (descriptions, icon, screenshots) | `fastlane/metadata/android/en-US/` |
+| End-user app with a unique package name | `com.bracketup.app` |
+
+File the request with:
+
+- Repository: `https://github.com/lbellows/bracket-up`
+- Package name: `com.bracketup.app`
+- Which APK to track: **`BracketUp-<version>-arm64-v8a.apk`**. A release carries
+  three per-ABI APKs and IzzyOnDroid hosts one build per app, so say which one.
+  arm64-v8a is the right choice: recent phones (Pixel 7 and later, and every
+  device on newer ARM cores) cannot execute 32-bit ARM code at all, so an
+  armeabi-v7a build would simply not install for them.
+
+Izzy's scanner checks the APK for tracking libraries and non-free blobs. There
+are none, so this should pass without changes.
+
+After inclusion, every new GitHub Release is picked up automatically — usually
+within a day — and you do not file anything again. Users install by adding
 `https://apt.izzysoft.de/fdroid/repo` as a repository in the F-Droid client.
 
 ---
@@ -187,8 +242,13 @@ file anything again. Users install by adding
 
 1. Fork <https://gitlab.com/fdroid/fdroiddata>.
 2. Copy `fdroid/com.bracketup.app.yml` from this repo to
-   `metadata/com.bracketup.app.yml` in your fork, and set `commit:` to the tag you
-   released (e.g. `v1.0.1`) with the matching `versionName` / `versionCode`.
+   `metadata/com.bracketup.app.yml` in your fork. It carries three build entries
+   per release — one per architecture, each pinned with
+   `gradleprops: reactNativeArchitectures=<abi>` and the versionCode that ABI's
+   APK will declare (`versionCode * 10 + 1/2/3`). For a new release, add three
+   more entries with the new `commit:`, `versionName` and versionCodes, and move
+   `CurrentVersion` / `CurrentVersionCode` up. `AutoUpdateMode` is `None`
+   precisely because one release is three entries.
 3. Test the recipe if you can — it needs Docker and a lot of disk:
 
    ```bash
@@ -203,6 +263,10 @@ Things a reviewer may raise, and where they stand here:
 - **Prebuilt binaries in `node_modules`.** Covered by `scanignore`. React Native's
   Gradle plugin and the Hermes compiler are build-time tools; the native libraries
   in the APK are compiled during the build from Maven-hosted sources.
+- **R8 / minification.** Release builds run R8. Keep rules are in
+  `android/app/proguard-rules.pro`; upstream CI installs the minified APK on an
+  emulator and fails if the app does not render, so the setting is tested rather
+  than assumed.
 - **The JitPack repository in `android/build.gradle`.** Nothing currently resolves
   from it — it is part of the Expo template. If a reviewer objects, it can be
   removed with a config plugin.

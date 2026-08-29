@@ -1,7 +1,7 @@
 {
   "name": "bracketup",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
@@ -11,7 +11,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "prebuild": "expo prebuild --platform android --no-install --clean",
-    "prebuild:check": "./scripts/check-release-metadata.sh"
+    "prebuild:check": "./scripts/check-release-metadata.sh",
+    "changelogs": "./scripts/sync-changelogs.sh"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",

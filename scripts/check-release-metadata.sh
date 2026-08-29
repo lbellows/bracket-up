@@ -24,15 +24,29 @@ fi
 
 VERSION_CODE=$(node -p "require('./app.json').expo.android.versionCode")
 VERSION_NAME=$(node -p "require('./app.json').expo.version")
-CHANGELOG="fastlane/metadata/android/en-US/changelogs/${VERSION_CODE}.txt"
+CHANGELOG_DIR=fastlane/metadata/android/en-US/changelogs
+CHANGELOG="${CHANGELOG_DIR}/${VERSION_CODE}.txt"
 
-echo "==> Checking changelog for versionCode ${VERSION_CODE} (v${VERSION_NAME})"
+echo "==> Checking changelogs for versionCode ${VERSION_CODE} (v${VERSION_NAME})"
 if [ ! -s "$CHANGELOG" ]; then
   echo "ERROR: ${CHANGELOG} is missing or empty."
   echo "       F-Droid and IzzyOnDroid read release notes from that path."
   fail=1
 else
   echo "    ${CHANGELOG} present"
+
+  # The build produces one APK per ABI, each with its own versionCode, and each
+  # store looks the changelog up by the versionCode of the APK it is serving.
+  for offset in $(node -p "Object.values(require('./plugins/withAbiSplits.js').ABI_VERSION_CODE_OFFSETS).join(' ')"); do
+    abi_changelog="${CHANGELOG_DIR}/$((VERSION_CODE * 10 + offset)).txt"
+    if ! cmp -s "$CHANGELOG" "$abi_changelog"; then
+      echo "ERROR: ${abi_changelog} is missing or differs from ${CHANGELOG}."
+      echo "       Run 'npm run changelogs' to copy it to every per-ABI versionCode."
+      fail=1
+    else
+      echo "    ${abi_changelog} matches"
+    fi
+  done
 fi
 
 exit $fail

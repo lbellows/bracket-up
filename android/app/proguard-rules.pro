@@ -12,3 +12,9 @@
 -keep class com.facebook.react.turbomodule.** { *; }
 
 # Add any project specific keep options here:
+
+# react-native-worklets ships these rules in its own package but does not declare
+# them as consumer rules, so nothing applies them to this app. Copied verbatim
+# from node_modules/react-native-worklets/android/proguard-rules.pro.
+-keep class com.swmansion.worklets.** { *; }
+-keep class com.facebook.react.fabric.** { *; }

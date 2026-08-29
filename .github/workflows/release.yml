@@ -1,7 +1,9 @@
 name: Release APK
 
-# Builds a signed universal APK and attaches it to a GitHub Release.
-# IzzyOnDroid watches this repo's releases and picks the APK up automatically.
+# Builds one signed APK per CPU architecture, proves each one runs, and attaches
+# them to a GitHub Release. IzzyOnDroid watches this repo's releases and picks
+# them up automatically. Running this workflow by hand (workflow_dispatch) does
+# everything except publish, which is the way to check a build before tagging.
 on:
   push:
     tags:
@@ -10,6 +12,12 @@ on:
 
 permissions:
   contents: write
+
+env:
+  # IzzyOnDroid's hard limit for a single APK. A universal APK with every
+  # architecture in it was ~97 MB, which is why the build is split per ABI and
+  # minified; this guard is here so a future dependency cannot quietly undo that.
+  MAX_APK_BYTES: 30000000
 
 jobs:
   build:
@@ -45,7 +53,7 @@ jobs:
           fi
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
 
-      - name: Build release APK
+      - name: Build release APKs
         env:
           BRACKETUP_STORE_FILE: ${{ runner.temp }}/release.keystore
           BRACKETUP_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
@@ -54,35 +62,115 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: Confirm the APK is signed with the release key and requests no permissions
+      - name: Check every APK is signed, single-ABI, permission-free and small enough
         run: |
-          APK=android/app/build/outputs/apk/release/app-release.apk
           BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
-          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
-
-          # AndroidX Core declares <applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
-          # for ContextCompat.registerReceiver. It is defined by this app, namespaced to
-          # this app, and protectionLevel="signature", so no other app can ever hold it and
-          # it grants no user-facing capability. Anything else — any android.permission.*
-          # or third-party permission — means a dependency reintroduced one, which is a bug.
-          PERMS="$("$BUILD_TOOLS/aapt2" dump permissions "$APK" \
-                   | grep -E '^uses-permission:' \
-                   | grep -v 'DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION' || true)"
-          if [ -n "$PERMS" ]; then
-            echo "::error::APK requests permissions it should not have:"
-            echo "$PERMS"
+          shopt -s nullglob
+          APKS=(android/app/build/outputs/apk/release/*.apk)
+          if [ "${#APKS[@]}" -ne 3 ]; then
+            echo "::error::Expected 3 per-ABI APKs, found ${#APKS[@]}."
             exit 1
           fi
-          echo "APK requests no Android permissions."
 
-      - name: Name the APK after the release
+          for APK in "${APKS[@]}"; do
+            echo "::group::$(basename "$APK")"
+            "$BUILD_TOOLS/aapt2" dump badging "$APK" | grep -E '^package:|^native-code:'
+            "$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
+
+            # AndroidX Core declares <applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+            # for ContextCompat.registerReceiver. It is defined by this app, namespaced to
+            # this app, and protectionLevel="signature", so no other app can ever hold it and
+            # it grants no user-facing capability. Anything else — any android.permission.*
+            # or third-party permission — means a dependency reintroduced one, which is a bug.
+            PERMS="$("$BUILD_TOOLS/aapt2" dump permissions "$APK" \
+                     | grep -E '^uses-permission:' \
+                     | grep -v 'DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION' || true)"
+            if [ -n "$PERMS" ]; then
+              echo "::error::$(basename "$APK") requests permissions it should not have:"
+              echo "$PERMS"
+              exit 1
+            fi
+
+            # One architecture per APK: a universal build would sail past the size
+            # limit below without anyone noticing which APK it came from.
+            ABIS="$(unzip -Z1 "$APK" 'lib/*' | cut -d/ -f2 | sort -u)"
+            if [ "$(echo "$ABIS" | wc -l)" -ne 1 ]; then
+              echo "::error::$(basename "$APK") contains more than one ABI: $(echo $ABIS)"
+              exit 1
+            fi
+
+            SIZE="$(stat -c%s "$APK")"
+            echo "$(basename "$APK"): $ABIS, $((SIZE / 1000000)) MB"
+            if [ "$SIZE" -gt "$MAX_APK_BYTES" ]; then
+              echo "::error::$(basename "$APK") is ${SIZE} bytes, over IzzyOnDroid's ${MAX_APK_BYTES}-byte limit."
+              exit 1
+            fi
+            echo "::endgroup::"
+          done
+
+      - name: Name the APKs after the release
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          cp android/app/build/outputs/apk/release/app-release.apk \
-             "BracketUp-${VERSION}.apk"
+          VERSION="$(node -p "require('./app.json').expo.version")"
+          mkdir -p dist
+          for APK in android/app/build/outputs/apk/release/*.apk; do
+            ABI="$(basename "$APK" | sed -E 's/^app-(.*)-release\.apk$/\1/')"
+            cp "$APK" "dist/BracketUp-${VERSION}-${ABI}.apk"
+          done
+          ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: apks
+          path: dist/*.apk
+          if-no-files-found: error
+
+  smoke-test:
+    # R8 runs over release builds, and a missing keep rule only shows up at
+    # runtime, so the APK is installed and the first screen checked before
+    # anything is published.
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: apks
+          path: dist
+
+      - name: Enable KVM for the emulator
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Launch the x86_64 APK on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: ./scripts/smoke-test-apk.sh "$(ls dist/*-x86_64.apk)"
+
+  publish:
+    needs: [build, smoke-test]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: apks
+          path: dist
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: BracketUp-*.apk
+          files: dist/*.apk
           generate_release_notes: true

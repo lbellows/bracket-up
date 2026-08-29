@@ -19,10 +19,69 @@ RepoType: git
 Repo: https://github.com/lbellows/bracket-up.git
 
 Builds:
-  - versionName: 1.0.0
-    versionCode: 1
-    commit: v1.0.0
+  # One build per architecture. The Gradle build splits the APK by ABI, and
+  # `reactNativeArchitectures` narrows each run to a single one so every build
+  # here produces exactly one APK. Each APK's versionCode is
+  # `expo.android.versionCode * 10 + <abi offset>` (armeabi-v7a 1, arm64-v8a 2,
+  # x86_64 3), assigned in plugins/withAbiSplits.js.
+  - versionName: 1.0.1
+    versionCode: 21
+    commit: v1.0.1
     subdir: android/app
+    gradleprops:
+      - reactNativeArchitectures=armeabi-v7a
+    sudo:
+      - curl -Lo node.tar.xz https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.xz
+      - echo "d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307  node.tar.xz" | sha256sum -c -
+      - tar xf node.tar.xz --directory=/opt
+      - mv /opt/node-v22.23.2-linux-x64 /opt/node
+      - ln -s /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
+    init:
+      - npm ci
+    gradle:
+      - yes
+    rm:
+      - .github
+      - store-assets
+    scanignore:
+      # React Native ships prebuilt tooling (hermesc, the Gradle plugin's jars)
+      # inside node_modules. These are build-time only and are not packaged into
+      # the APK; the shipped native libraries are compiled from the Maven-hosted
+      # React Native and Hermes sources during the Gradle build.
+      - node_modules
+
+  - versionName: 1.0.1
+    versionCode: 22
+    commit: v1.0.1
+    subdir: android/app
+    gradleprops:
+      - reactNativeArchitectures=arm64-v8a
+    sudo:
+      - curl -Lo node.tar.xz https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.xz
+      - echo "d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307  node.tar.xz" | sha256sum -c -
+      - tar xf node.tar.xz --directory=/opt
+      - mv /opt/node-v22.23.2-linux-x64 /opt/node
+      - ln -s /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
+    init:
+      - npm ci
+    gradle:
+      - yes
+    rm:
+      - .github
+      - store-assets
+    scanignore:
+      # React Native ships prebuilt tooling (hermesc, the Gradle plugin's jars)
+      # inside node_modules. These are build-time only and are not packaged into
+      # the APK; the shipped native libraries are compiled from the Maven-hosted
+      # React Native and Hermes sources during the Gradle build.
+      - node_modules
+
+  - versionName: 1.0.1
+    versionCode: 23
+    commit: v1.0.1
+    subdir: android/app
+    gradleprops:
+      - reactNativeArchitectures=x86_64
     sudo:
       - curl -Lo node.tar.xz https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.xz
       - echo "d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307  node.tar.xz" | sha256sum -c -
@@ -48,10 +107,18 @@ MaintainerNotes: |-
   repository and is regenerated with `npx expo prebuild`; CI fails the build if
   it drifts from app.json, so the checked-in project always matches the config.
 
+  Every release has three builds, one per ABI, because a universal APK is ~97 MB.
+  AutoUpdateMode is None for that reason: an update means adding three entries
+  with the versionCodes described above, not one.
+
   `gradle assembleRelease` produces an unsigned APK here: the release signing
   config activates only when a keystore is supplied via environment variables,
   which the upstream GitHub Actions release build does and this build does not.
   No keystore is committed to the repository.
+
+  Release builds run R8 (`android.enableMinifyInReleaseBuilds=true`). The keep
+  rules live in android/app/proguard-rules.pro; upstream CI installs the
+  minified APK on an emulator and fails the release if the app does not render.
 
   The app is fully offline: it declares no Android permissions at all, makes no
   network requests, and contains no analytics, advertising or crash reporting.
@@ -64,7 +131,7 @@ MaintainerNotes: |-
   Expo template emits for expo-updates is stripped by a config plugin
   (plugins/withoutUpdatesMetadata.js) so the manifest does not imply otherwise.
 
-AutoUpdateMode: Version
+AutoUpdateMode: None
 UpdateCheckMode: Tags
-CurrentVersion: 1.0.0
-CurrentVersionCode: 1
+CurrentVersion: 1.0.1
+CurrentVersionCode: 23
