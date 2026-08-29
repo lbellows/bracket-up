@@ -258,8 +258,10 @@ within a day — and you do not file anything again. Users install by adding
    `gradleprops: reactNativeArchitectures=<abi>` and the versionCode that ABI's
    APK will declare (`versionCode * 10 + 1/2/3`). For a new release, add three
    more entries with the new `commit:`, `versionName` and versionCodes, and move
-   `CurrentVersion` / `CurrentVersionCode` up. `AutoUpdateMode` is `None`
-   precisely because one release is three entries.
+   `CurrentVersion` / `CurrentVersionCode` up — or let F-Droid do it, since
+   `VercodeOperation` (`10 * %c + 1/2/3`) tells the auto-updater to copy all
+   three entries on a new tag and assign each the code that ABI's APK declares.
+   The entries must stay in ascending-offset order for that mapping to hold.
 3. Test the recipe if you can — it needs Docker and a lot of disk:
 
    ```bash

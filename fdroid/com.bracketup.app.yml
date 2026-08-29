@@ -108,8 +108,9 @@ MaintainerNotes: |-
   it drifts from app.json, so the checked-in project always matches the config.
 
   Every release has three builds, one per ABI, because a universal APK is ~97 MB.
-  AutoUpdateMode is None for that reason: an update means adding three entries
-  with the versionCodes described above, not one.
+  VercodeOperation reproduces the versionCode scheme, so the auto-updater copies
+  all three entries on a new tag and gives each the right code — the build blocks
+  are ordered to match the operations, ascending.
 
   `gradle assembleRelease` produces an unsigned APK here: the release signing
   config activates only when a keystore is supplied via environment variables,
@@ -131,7 +132,11 @@ MaintainerNotes: |-
   Expo template emits for expo-updates is stripped by a config plugin
   (plugins/withoutUpdatesMetadata.js) so the manifest does not imply otherwise.
 
-AutoUpdateMode: None
+AutoUpdateMode: Version
 UpdateCheckMode: Tags
+VercodeOperation:
+  - 10 * %c + 1
+  - 10 * %c + 2
+  - 10 * %c + 3
 CurrentVersion: 1.0.1
 CurrentVersionCode: 23
