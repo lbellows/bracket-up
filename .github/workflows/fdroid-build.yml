@@ -83,6 +83,15 @@ jobs:
           cp -v "$home_vagrant"/tmp/*.apk /work/ 2>/dev/null || true
           mkdir -p /work/logs && cp -v "$home_vagrant"/logs/* /work/logs/ 2>/dev/null || true
           chmod -R a+rw /work
+
+          # Inspect here rather than on the runner: the disk-cleanup step above
+          # deletes the runner's Android SDK, and this container has one.
+          APK=$(ls /work/*.apk 2>/dev/null | head -1)
+          if [ -n "$APK" ]; then
+            echo "::: built $(basename "$APK") ($(stat -c %s "$APK") bytes)"
+            "$ANDROID_HOME"/build-tools/36.0.0/aapt2 dump badging "$APK" \
+              | grep -E '^package:|^native-code:|^uses-permission:'
+          fi
           exit $rc
           SCRIPT
           docker run --rm \
@@ -90,15 +99,6 @@ jobs:
             -v "$PWD/work:/work" \
             registry.gitlab.com/fdroid/fdroidserver:buildserver-trixie \
             bash /work/build.sh
-
-      - name: Inspect the built APK
-        if: always()
-        run: |
-          APK=$(ls work/*.apk 2>/dev/null | head -1) || exit 0
-          [ -n "$APK" ] || { echo "no APK produced"; exit 0; }
-          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | tail -1)
-          "$BT/aapt2" dump badging "$APK" | grep -E '^package:|^native-code:|^uses-permission:'
-          ls -l "$APK"
 
       - uses: actions/upload-artifact@v7
         if: always()
