@@ -14,3 +14,8 @@ builds/
 # Google Play service account keys — never commit these
 *service-account*.json
 api-*.json
+
+# Release signing — never commit the keystore or its passwords
+*.keystore
+*.jks
+android/keystore.properties

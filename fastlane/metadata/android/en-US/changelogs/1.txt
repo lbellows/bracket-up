@@ -1,0 +1,7 @@
+First release.
+
+* Double-elimination brackets with automatic seeding and byes
+* Winners and losers brackets, grand final with bracket reset
+* Score entry, final standings and match history
+* Markdown export
+* Fully offline, zero permissions

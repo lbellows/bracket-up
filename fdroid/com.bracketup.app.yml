@@ -1,0 +1,70 @@
+# F-Droid build recipe for BracketUp.
+#
+# This file is not used by this repository — it is the metadata to submit to
+# https://gitlab.com/fdroid/fdroiddata as metadata/com.bracketup.app.yml.
+# It is kept here so the recipe is versioned alongside the code it builds.
+# See FDROID.md for the submission procedure.
+
+Categories:
+  - Sports & Health
+License: MIT
+AuthorName: LCB
+SourceCode: https://github.com/lbellows/bracket-up
+IssueTracker: https://github.com/lbellows/bracket-up/issues
+Changelog: https://github.com/lbellows/bracket-up/releases
+
+AutoName: BracketUp
+
+RepoType: git
+Repo: https://github.com/lbellows/bracket-up.git
+
+Builds:
+  - versionName: 1.0.0
+    versionCode: 1
+    commit: v1.0.0
+    subdir: android/app
+    sudo:
+      - curl -Lo node.tar.xz https://nodejs.org/dist/v22.23.2/node-v22.23.2-linux-x64.tar.xz
+      - echo "d60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307  node.tar.xz" | sha256sum -c -
+      - tar xf node.tar.xz --directory=/opt
+      - mv /opt/node-v22.23.2-linux-x64 /opt/node
+      - ln -s /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
+    init:
+      - npm ci
+    gradle:
+      - yes
+    rm:
+      - .github
+      - store-assets
+    scanignore:
+      # React Native ships prebuilt tooling (hermesc, the Gradle plugin's jars)
+      # inside node_modules. These are build-time only and are not packaged into
+      # the APK; the shipped native libraries are compiled from the Maven-hosted
+      # React Native and Hermes sources during the Gradle build.
+      - node_modules
+
+MaintainerNotes: |-
+  Expo (React Native) app. The native android/ project is committed to the
+  repository and is regenerated with `npx expo prebuild`; CI fails the build if
+  it drifts from app.json, so the checked-in project always matches the config.
+
+  `gradle assembleRelease` produces an unsigned APK here: the release signing
+  config activates only when a keystore is supplied via environment variables,
+  which the upstream GitHub Actions release build does and this build does not.
+  No keystore is committed to the repository.
+
+  The app is fully offline: it declares no Android permissions at all, makes no
+  network requests, and contains no analytics, advertising or crash reporting.
+  No Google Play Services or other proprietary dependency is present. Every
+  runtime dependency is MIT, Apache-2.0, BSD or ISC licensed.
+
+  expo-updates is deliberately not a dependency, so there is no over-the-air
+  code delivery: the JavaScript bundle is compiled into the APK at build time
+  and cannot be replaced after installation. The manifest meta-data that the
+  Expo template emits for expo-updates is stripped by a config plugin
+  (plugins/withoutUpdatesMetadata.js) so the manifest does not imply otherwise.
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: 1.0.0
+CurrentVersionCode: 1

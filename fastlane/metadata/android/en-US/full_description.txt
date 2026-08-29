@@ -1,0 +1,24 @@
+BracketUp creates and tracks double-elimination tournament brackets for anything you run in person: pool nights, fighting-game sets, table tennis ladders, board game leagues, office competitions.
+
+Type in the players, and BracketUp builds the whole bracket — winners side, losers side, grand final with a bracket reset. Tap a match to enter the score and everyone advances automatically.
+
+Everything happens on your device. There is no account to create, no server to sync with, and the app requests no Android permissions at all.
+
+<b>Features</b>
+
+* Double-elimination brackets for any number of players from 3 to 32 and beyond
+* Standard tournament seeding, with byes automatically given to the top seeds
+* Winners and losers brackets shown as two scrollable swimlanes
+* Grand final with the bracket-reset match, played only when the losers-bracket champion wins the first one
+* Tap any match to record scores; winners and losers are advanced for you
+* Final standings with full placements and complete match history
+* Export a tournament as Markdown to share anywhere
+* Runs entirely offline — your tournaments never leave the device
+
+<b>Privacy</b>
+
+BracketUp collects nothing. No analytics, no advertising, no crash reporting, no network requests. Tournament data is stored in the app's own private storage and is only ever removed when you delete it or uninstall the app. The app ships with zero Android permissions, so it is not technically capable of sending your data anywhere.
+
+<b>Bracket correctness</b>
+
+The bracket engine is covered by a randomised test suite that plays thousands of complete tournaments across every field size, asserting that exactly one champion emerges, that placements are contiguous, and that nobody is ever eliminated without playing. Bracket bugs tend to fail silently, so the engine is tested rather than trusted.

@@ -18,7 +18,16 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0f172a"
       },
-      "package": "com.bracketup.app"
+      "package": "com.bracketup.app",
+      "versionCode": 1,
+      "permissions": [],
+      "blockedPermissions": [
+        "android.permission.INTERNET",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.VIBRATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -37,17 +46,16 @@
         }
       ],
       "expo-sharing",
-      "expo-status-bar"
+      "expo-status-bar",
+      "./plugins/withReleaseSigning.js",
+      "./plugins/withoutUpdatesMetadata.js"
     ],
     "scheme": "bracketup",
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "1c2f15ba-2bac-4489-abc8-b960718bfc76"
-      }
+      "router": {}
     }
   }
 }

@@ -32,13 +32,39 @@ seeded RNG so failures reproduce) and asserting end-state invariants:
 
 Run the suite after any change to `bracketGenerator.ts` or `doubleElimLogic.ts`.
 
-## EAS Android build
+## Android builds
+
+Releases are built by GitHub Actions on any `v*` tag and published to GitHub
+Releases, from where IzzyOnDroid picks them up. F-Droid builds from source using
+the recipe in `fdroid/`. See [FDROID.md](FDROID.md) for the full procedure.
+
+The native `android/` project is committed and generated from `app.json`:
 
 ```bash
-npm install -g eas-cli
-eas login
-eas build --platform android --profile preview
+npm run prebuild        # regenerate android/ after changing app.json
+npm run prebuild:check  # verify android/ and the changelog match the config
 ```
+
+Building locally needs JDK 17, the Android SDK, and the NDK — `react-native-reanimated`,
+`react-native-worklets` and `react-native-screens` compile C++ from source under the
+new architecture. CI provides all of it, so tagging a release is the easier path than
+setting up a local toolchain.
+
+### Zero permissions
+
+The app declares no Android permissions. The five that Expo adds by default
+(`INTERNET`, `SYSTEM_ALERT_WINDOW`, `READ_EXTERNAL_STORAGE`,
+`WRITE_EXTERNAL_STORAGE`, `VIBRATE`) are stripped via `android.blockedPermissions`
+in `app.json`, because nothing in the app uses them.
+
+`plugins/withoutUpdatesMetadata.js` additionally strips the `expo.modules.updates.*`
+manifest entries that the Expo template emits unconditionally. `expo-updates` is not
+a dependency, so the app has no over-the-air update mechanism and the manifest should
+not imply one.
+
+The cost is that a locally built dev APK cannot reach the Metro bundler without
+`INTERNET`. Develop with `npx expo start` and Expo Go, or `npm run web`. See the
+development caveat in [FDROID.md](FDROID.md) if you need a Metro-connected build.
 
 ## Project structure
 
