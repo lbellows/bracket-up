@@ -333,6 +333,11 @@ So the recipe fetches a pinned Temurin 17 in its `sudo:` block, the same way it
 fetches Node, and names the path in `gradleprops` so Gradle finds it whatever
 else it auto-detects. This is verified — it produces the APK.
 
+fdroiddata CI builds all three ABI entries on one VM, so the Node install has
+to survive being run again: `rm -rf /opt/node` before `mv`, and `ln -sf`. A
+single-ABI test job will not catch that. The Node tarball is the official
+`.tar.gz`; the buildserver image has no `xz`.
+
 If a reviewer questions the download, the answer is that it is not a workaround
 invented for F-Droid. The `build` and `smoke-test` jobs in
 `.github/workflows/release.yml` both run `actions/setup-java` with

@@ -22,9 +22,11 @@ Builds:
       - echo "b294a556e639d64338823920e5866c21c02741742d2e1529ee1a225c1ec9252a  node.tar.gz"
         | sha256sum -c -
       - tar xzf node.tar.gz --directory=/opt
+      - rm -rf /opt/node
       - mv /opt/node-v22.23.2-linux-x64 /opt/node
-      - ln -s /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
-      - curl -Lo jdk17.tar.gz https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz
+      - ln -sf /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
+      - curl -Lo jdk17.tar.gz 
+        https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz
       - echo "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e  jdk17.tar.gz"
         | sha256sum -c -
       - mkdir -p /usr/lib/jvm
@@ -50,9 +52,11 @@ Builds:
       - echo "b294a556e639d64338823920e5866c21c02741742d2e1529ee1a225c1ec9252a  node.tar.gz"
         | sha256sum -c -
       - tar xzf node.tar.gz --directory=/opt
+      - rm -rf /opt/node
       - mv /opt/node-v22.23.2-linux-x64 /opt/node
-      - ln -s /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
-      - curl -Lo jdk17.tar.gz https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz
+      - ln -sf /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
+      - curl -Lo jdk17.tar.gz 
+        https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz
       - echo "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e  jdk17.tar.gz"
         | sha256sum -c -
       - mkdir -p /usr/lib/jvm
@@ -78,9 +82,11 @@ Builds:
       - echo "b294a556e639d64338823920e5866c21c02741742d2e1529ee1a225c1ec9252a  node.tar.gz"
         | sha256sum -c -
       - tar xzf node.tar.gz --directory=/opt
+      - rm -rf /opt/node
       - mv /opt/node-v22.23.2-linux-x64 /opt/node
-      - ln -s /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
-      - curl -Lo jdk17.tar.gz https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz
+      - ln -sf /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
+      - curl -Lo jdk17.tar.gz 
+        https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz
       - echo "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e  jdk17.tar.gz"
         | sha256sum -c -
       - mkdir -p /usr/lib/jvm
@@ -116,6 +122,9 @@ MaintainerNotes: |-
   repos a few Expo modules carry. All of it is build-time only and none of it is
   packaged into the APK; the native libraries that are shipped are compiled
   during the Gradle build from the Maven-hosted React Native and Hermes sources.
+
+  Node and Temurin 17 are fetched in sudo. Each ABI entry re-runs that block on
+  the same VM, so the install is idempotent (`rm -rf /opt/node`, `ln -sf`).
 
   `gradle assembleRelease` produces an unsigned APK here: the release signing
   config activates only when a keystore is supplied via environment variables,
