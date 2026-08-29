@@ -19,3 +19,7 @@ api-*.json
 *.keystore
 *.jks
 android/keystore.properties
+
+# API tokens — never commit these
+.env
+.env.*
