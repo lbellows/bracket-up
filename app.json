@@ -50,7 +50,8 @@
       "./plugins/withReleaseSigning.js",
       "./plugins/withoutUpdatesMetadata.js",
       "./plugins/withAbiSplits.js",
-      "./plugins/withMinifiedRelease.js"
+      "./plugins/withMinifiedRelease.js",
+      "./plugins/withCompressedNativeLibs.js"
     ],
     "scheme": "bracketup",
     "experiments": {

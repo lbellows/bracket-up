@@ -36,6 +36,12 @@ in this repo, so the description, screenshots and changelogs are already in plac
   unminified APK was 97 MB — 72 MB of native libraries for four architectures of
   which a device runs one, plus 38 MB of unminified dex. 32-bit x86 is dropped
   altogether; nothing but old emulators uses it.
+- Native libraries are stored **compressed** in the APK
+  (`plugins/withCompressedNativeLibs.js`). Even split per ABI and minified, the
+  arm64 APK measured 32.2 MB with them uncompressed — Expo's default, and the
+  faster one to install. Compressed it is about 22 MB. Izzy's limit is on the
+  file they host, so download size is the one that decides whether the app is
+  listed; the trade is a slightly larger install footprint on the device.
 - Each per-ABI APK gets its own versionCode, `versionCode * 10 + <abi offset>`
   (armeabi-v7a 1, arm64-v8a 2, x86_64 3), because F-Droid and IzzyOnDroid index
   APKs by versionCode and three APKs sharing one would collide. So versionCode 2
