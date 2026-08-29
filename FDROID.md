@@ -204,8 +204,13 @@ Releases.
 The tracker moved. The old GitLab repo is archived and read-only; inclusion
 requests now go to Codeberg:
 
-- Issues: <https://codeberg.org/IzzyOnDroid/repo/issues> ("Inclusion request")
+- Issues: <https://codeberg.org/IzzyOnDroid/repodata/issues> — the maintenance
+  repo, not `IzzyOnDroid/repo`. Title requests `[AppRequest] <app name>`.
 - Policy: <https://izzyondroid.org/docs/general/AppInclusionPolicy/>
+
+The issue template asks you to confirm that you are the developer, that the app
+follows the inclusion policy, that it is not already listed or requested, and
+that the repository has a fastlane folder. All four hold here.
 
 Where this app stands against the policy:
 

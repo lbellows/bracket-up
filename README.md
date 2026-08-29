@@ -38,6 +38,10 @@ Releases are built by GitHub Actions on any `v*` tag and published to GitHub
 Releases, from where IzzyOnDroid picks them up. F-Droid builds from source using
 the recipe in `fdroid/`. See [FDROID.md](FDROID.md) for the full procedure.
 
+Each release carries one APK per CPU architecture rather than a single universal
+one — download `arm64-v8a` for any phone made in roughly the last decade,
+`armeabi-v7a` for an older 32-bit device, `x86_64` for an emulator.
+
 The native `android/` project is committed and generated from `app.json`:
 
 ```bash
