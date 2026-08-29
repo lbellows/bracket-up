@@ -88,8 +88,12 @@ All four are set on `lbellows/bracket-up` (verify with `gh secret list`):
 |---|---|
 | `ANDROID_KEYSTORE_BASE64` | `base64 -w0` of the keystore |
 | `ANDROID_STORE_PASSWORD` | the keystore password |
-| `ANDROID_KEY_ALIAS` | `bracketup` |
 | `ANDROID_KEY_PASSWORD` | same as the store password |
+
+The key alias (`bracketup`) is set as a literal in the workflow rather than a
+secret. It is not sensitive — `apksigner` prints it from any signed APK — and
+storing it as a secret made GitHub redact the string "bracketup" from every log
+line, including the app's own package name.
 
 GitHub secrets are write-only, so these cannot be read back — if the local copies
 are ever lost, the key is lost with them. To rotate, re-run:
@@ -99,7 +103,6 @@ KS=~/.android-signing/bracketup-release.keystore
 PASS=$(cat ~/.android-signing/bracketup-release.password)
 base64 -w0 "$KS" | gh secret set ANDROID_KEYSTORE_BASE64 --repo lbellows/bracket-up
 printf '%s' "$PASS" | gh secret set ANDROID_STORE_PASSWORD --repo lbellows/bracket-up
-printf '%s' bracketup | gh secret set ANDROID_KEY_ALIAS --repo lbellows/bracket-up
 printf '%s' "$PASS" | gh secret set ANDROID_KEY_PASSWORD --repo lbellows/bracket-up
 ```
 

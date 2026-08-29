@@ -49,23 +49,31 @@ jobs:
         env:
           BRACKETUP_STORE_FILE: ${{ runner.temp }}/release.keystore
           BRACKETUP_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-          BRACKETUP_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          BRACKETUP_KEY_ALIAS: bracketup
           BRACKETUP_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
 
-      - name: Confirm the APK is signed with the release key and has no permissions
+      - name: Confirm the APK is signed with the release key and requests no permissions
         run: |
           APK=android/app/build/outputs/apk/release/app-release.apk
           BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
           "$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
-          PERMS="$("$BUILD_TOOLS/aapt2" dump permissions "$APK" | grep -E '^(uses-)?permission:' || true)"
+
+          # AndroidX Core declares <applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+          # for ContextCompat.registerReceiver. It is defined by this app, namespaced to
+          # this app, and protectionLevel="signature", so no other app can ever hold it and
+          # it grants no user-facing capability. Anything else — any android.permission.*
+          # or third-party permission — means a dependency reintroduced one, which is a bug.
+          PERMS="$("$BUILD_TOOLS/aapt2" dump permissions "$APK" \
+                   | grep -E '^uses-permission:' \
+                   | grep -v 'DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION' || true)"
           if [ -n "$PERMS" ]; then
             echo "::error::APK requests permissions it should not have:"
             echo "$PERMS"
             exit 1
           fi
-          echo "APK declares no permissions."
+          echo "APK requests no Android permissions."
 
       - name: Name the APK after the release
         run: |
