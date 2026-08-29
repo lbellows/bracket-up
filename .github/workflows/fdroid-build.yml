@@ -2,9 +2,9 @@
 # `fdroid build` inside F-Droid's own buildserver image. Manual only -- this is
 # a slow, large job and nothing about a normal push needs it.
 #
-# See FDROID.md ("Known blocker: the Java 17 toolchain") for why provision_jdk17
-# exists. Leave it on to verify the rest of the recipe end to end; turn it off
-# to reproduce exactly what F-Droid's buildserver does today.
+# The recipe provisions its own Temurin 17 (see FDROID.md, "The Java 17
+# toolchain"), so this job only has to supply the SDK and NDK that fdroiddata's
+# CI installs on top of the image.
 name: F-Droid recipe build
 
 on:
@@ -15,17 +15,13 @@ on:
         type: choice
         options: ['22', '21', '23']
         default: '22'
-      provision_jdk17:
-        description: Install Temurin 17 in the buildserver (upstream CI builds with it)
-        type: boolean
-        default: true
 
 jobs:
   fdroid-build:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # The buildserver image plus the SDK, NDK and a Gradle build do not fit
       # alongside the runner's preinstalled toolchains.
@@ -38,7 +34,6 @@ jobs:
       - name: Run fdroid build in the buildserver image
         env:
           VERSIONCODE: ${{ inputs.versioncode }}
-          PROVISION_JDK17: ${{ inputs.provision_jdk17 }}
         run: |
           mkdir -p work && cp fdroid/com.bracketup.app.yml work/
           cat > work/build.sh <<'SCRIPT'
@@ -61,16 +56,6 @@ jobs:
           yes | sdkmanager "platform-tools" "build-tools;36.0.0" \
                 "platforms;android-36" "ndk;27.1.12297006" "cmake;3.22.1" > /tmp/sdk.log 2>&1 \
             || { tail -20 /tmp/sdk.log; exit 1; }
-
-          if [ "$PROVISION_JDK17" = "true" ]; then
-            # What actions/setup-java does for the release build, done by hand:
-            # RN forces a Java 17 toolchain on every module and Debian trixie
-            # has no openjdk-17 package.
-            curl -Lo jdk17.tar.gz https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz
-            echo "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e  jdk17.tar.gz" | sha256sum -c -
-            mkdir -p /usr/lib/jvm && tar xzf jdk17.tar.gz --directory=/usr/lib/jvm
-            rm jdk17.tar.gz
-          fi
 
           mkdir -p "$home_vagrant"/{metadata,build,tmp,logs,unsigned,srclibs,.android,.gradle}
           printf 'gradle: /usr/local/bin/gradle\n' > "$home_vagrant/config.yml"
@@ -101,7 +86,7 @@ jobs:
           exit $rc
           SCRIPT
           docker run --rm \
-            -e VERSIONCODE -e PROVISION_JDK17 \
+            -e VERSIONCODE \
             -v "$PWD/work:/work" \
             registry.gitlab.com/fdroid/fdroidserver:buildserver-trixie \
             bash /work/build.sh
@@ -115,7 +100,7 @@ jobs:
           "$BT/aapt2" dump badging "$APK" | grep -E '^package:|^native-code:|^uses-permission:'
           ls -l "$APK"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: fdroid-build-${{ inputs.versioncode }}

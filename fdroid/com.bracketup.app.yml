@@ -24,6 +24,11 @@ Builds:
       - tar xzf node.tar.gz --directory=/opt
       - mv /opt/node-v22.23.2-linux-x64 /opt/node
       - ln -s /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
+      - curl -Lo jdk17.tar.gz https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz
+      - echo "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e  jdk17.tar.gz"
+        | sha256sum -c -
+      - mkdir -p /usr/lib/jvm
+      - tar xzf jdk17.tar.gz --directory=/usr/lib/jvm
     init: npm ci
     gradle:
       - yes
@@ -34,6 +39,7 @@ Builds:
       - node_modules
     gradleprops:
       - reactNativeArchitectures=armeabi-v7a
+      - org.gradle.java.installations.paths=/usr/lib/jvm/jdk-17.0.20.1+1
 
   - versionName: 1.0.1
     versionCode: 22
@@ -46,6 +52,11 @@ Builds:
       - tar xzf node.tar.gz --directory=/opt
       - mv /opt/node-v22.23.2-linux-x64 /opt/node
       - ln -s /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
+      - curl -Lo jdk17.tar.gz https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz
+      - echo "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e  jdk17.tar.gz"
+        | sha256sum -c -
+      - mkdir -p /usr/lib/jvm
+      - tar xzf jdk17.tar.gz --directory=/usr/lib/jvm
     init: npm ci
     gradle:
       - yes
@@ -56,6 +67,7 @@ Builds:
       - node_modules
     gradleprops:
       - reactNativeArchitectures=arm64-v8a
+      - org.gradle.java.installations.paths=/usr/lib/jvm/jdk-17.0.20.1+1
 
   - versionName: 1.0.1
     versionCode: 23
@@ -68,6 +80,11 @@ Builds:
       - tar xzf node.tar.gz --directory=/opt
       - mv /opt/node-v22.23.2-linux-x64 /opt/node
       - ln -s /opt/node/bin/node /opt/node/bin/npm /opt/node/bin/npx /usr/local/bin/
+      - curl -Lo jdk17.tar.gz https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_linux_hotspot_17.0.20.1_1.tar.gz
+      - echo "3808d1d15e3ec6bd5b84057fb5d84c33d8a1536a258146bcea2e603fc726e08e  jdk17.tar.gz"
+        | sha256sum -c -
+      - mkdir -p /usr/lib/jvm
+      - tar xzf jdk17.tar.gz --directory=/usr/lib/jvm
     init: npm ci
     gradle:
       - yes
@@ -78,6 +95,7 @@ Builds:
       - node_modules
     gradleprops:
       - reactNativeArchitectures=x86_64
+      - org.gradle.java.installations.paths=/usr/lib/jvm/jdk-17.0.20.1+1
 
 MaintainerNotes: |-
   Expo (React Native) app. The native android/ project is committed to the

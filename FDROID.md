@@ -313,10 +313,7 @@ Things a reviewer may raise, and where they stand here:
   `expo prebuild` (which fetches templates at build time). CI proves the committed
   project matches `app.json`.
 
-### Known blocker: the Java 17 toolchain
-
-The recipe has not yet built on F-Droid's buildserver, and the reason is not
-something the recipe can currently express.
+### The Java 17 toolchain
 
 React Native's Gradle plugin (`JdkConfiguratorUtils`) applies
 `kotlin { jvmToolchain(17) }` and `sourceCompatibility/targetCompatibility =
@@ -324,35 +321,36 @@ VERSION_17` to *every* module in the build, and `expo-modules-core` sets
 `kotlin.jvmToolchain(17)` for KSP as well. Gradle matches a toolchain version
 exactly. The buildserver installs `default-jdk-headless` and nothing else, which
 on Debian trixie is JDK 21 — and trixie has no `openjdk-17` package at all, only
-21 and 25. So the build fails at `:app:compileReleaseJavaWithJavac` with:
+21 and 25. Without a JDK 17 the build fails at
+`:app:compileReleaseJavaWithJavac` with:
 
 ```
 Cannot find a Java installation on your machine matching:
 {languageVersion=17, ...}. Toolchain auto-provisioning is not enabled.
 ```
 
-Three ways out, none yet chosen:
+So the recipe fetches a pinned Temurin 17 in its `sudo:` block, the same way it
+fetches Node, and names the path in `gradleprops` so Gradle finds it whatever
+else it auto-detects. This is verified — it produces the APK.
 
-- **Fetch a pinned JDK 17 in the `sudo:` block**, the way the recipe already
-  fetches Node. Verified to work — it produces the APK. The cost is a ~193 MB
-  binary download that a reviewer has to accept. Worth saying in the merge
-  request: this is not a workaround invented for F-Droid. The `build` and
-  `smoke-test` jobs in `.github/workflows/release.yml` both run
-  `actions/setup-java` with `distribution: temurin, java-version: 17`, so every
-  APK on the GitHub Releases page — including the ones IzzyOnDroid serves — is
-  already built with Temurin 17. Pinning it in the recipe only makes the
-  buildserver match how the app is built everywhere else.
-- **Set `react.internal.disableJavaVersionAlignment`.** React Native checks this
-  property and skips all of the above. It is a documented escape hatch, but it
-  sets no replacement target, so `android/app/build.gradle` would need explicit
-  `compileOptions` and a Kotlin `jvmTarget` to avoid an inconsistent-JVM-target
-  failure, and it does not cover `expo-modules-core`'s KSP toolchain.
-- **Wait for the toolchain requirement to move.** It is upstream React Native's
-  choice, not this app's; when RN aligns on 21 the problem disappears.
+If a reviewer questions the download, the answer is that it is not a workaround
+invented for F-Droid. The `build` and `smoke-test` jobs in
+`.github/workflows/release.yml` both run `actions/setup-java` with
+`distribution: temurin, java-version: 17`, so every APK on the GitHub Releases
+page — including the one IzzyOnDroid serves — is already built with Temurin 17.
+Pinning it here only makes the buildserver match how the app is built
+everywhere else.
 
-Worth raising in the merge request rather than guessing — F-Droid reviewers deal
-with this class of problem across every React Native app in the repo and will
-have a preference.
+Two alternatives, if it comes to that. React Native checks
+`react.internal.disableJavaVersionAlignment` and skips all of the above, but it
+sets no replacement target, so `android/app/build.gradle` would need explicit
+`compileOptions` and a Kotlin `jvmTarget` to avoid an inconsistent-JVM-target
+failure, and it does not cover `expo-modules-core`'s KSP toolchain. Or wait: the
+requirement is upstream React Native's, not this app's, and disappears when RN
+aligns on 21.
+
+Bump the pinned JDK the same way you would bump Node — new URL, new checksum
+from the same release, and the new directory name in the `gradleprops` path.
 
 ### Testing the recipe remotely
 
@@ -362,15 +360,15 @@ the recipe can be checked without reproducing that environment locally. It is
 `workflow_dispatch` only:
 
 ```bash
-gh workflow run "F-Droid recipe build"                      # arm64-v8a, JDK 17 provisioned
-gh workflow run "F-Droid recipe build" -f versioncode=21    # a different ABI
-gh workflow run "F-Droid recipe build" -f provision_jdk17=false   # reproduce the blocker
+gh workflow run "F-Droid recipe build"                     # arm64-v8a
+gh workflow run "F-Droid recipe build" -f versioncode=21   # a different ABI
 ```
 
 It builds from the tag named in the recipe's `commit:`, not from the branch you
-dispatch it on, and uploads the APK and fdroid's build logs as artifacts.
-Leaving `provision_jdk17` on verifies everything else in the recipe end to end;
-turning it off reproduces exactly what F-Droid's buildserver does today.
+dispatch it on, and uploads the APK and fdroid's build logs as artifacts. The
+job installs only what fdroiddata's CI installs on top of the buildserver image
+— platform-tools, build-tools, a platform, the NDK and CMake — so anything else
+the build needs has to come from the recipe, which is the point.
 
 ---
 
