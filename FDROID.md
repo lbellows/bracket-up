@@ -298,7 +298,7 @@ work on an ordinary machine, no Docker or Android SDK needed for the first:
 ```bash
 # in a fdroiddata checkout, with the recipe copied to metadata/
 fdroid lint -f com.bracketup.app        # metadata + canonical formatting
-fdroid rewritemeta com.bracketup.app    # must leave the file unchanged
+fdroid rewritemeta com.bracketup.app    # see the caveat below
 
 # the scan fdroiddata runs over the built APKs
 fdroid scanner -r -e BracketUp-<version>-arm64-v8a.apk
@@ -313,6 +313,15 @@ unpacking `build-tools_r36.1_linux.zip` from
 is enough, and does not require a JDK. Note that `fdroid lint` run outside a
 fdroiddata checkout wrongly reports the category as invalid — it reads the valid
 list from that repo's `config/categories.yml` and finds nothing without it.
+
+**`fdroid rewritemeta` run locally does not predict fdroiddata's CI.** Both 2.4.5
+and git master dump with `ruamel.yaml.YAML(typ='rt')` and no explicit width, so
+the line folding comes entirely from the installed **ruamel.yaml** version, and
+nothing warns you when it differs from CI's. ruamel 0.17.21 does not fold long
+plain scalars and so unwraps the long `curl` lines; 0.19.1 folds them back and is
+not even idempotent doing it. The long lines in this recipe are wrapped because
+that is the form fdroiddata's CI accepted — do not "fix" them to match a local
+run. The pipeline on the merge request is the only authority.
 
 Things a reviewer may raise, and where they stand here:
 
