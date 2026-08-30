@@ -1,9 +1,10 @@
 /**
  * Adds an opt-in `release` signing config to the generated Android project.
  *
- * F-Droid builds this app from source and signs the result with its own key, so
- * the release build must still succeed with no keystore present. This plugin
- * therefore wires signing to a keystore only when one is actually configured,
+ * The release build must still succeed with no keystore present — a fresh
+ * clone, a fork, or a CI job without the signing secrets should all be able to
+ * run `assembleRelease`. This plugin therefore wires signing to a keystore only
+ * when one is actually configured,
  * and otherwise leaves the release APK unsigned. It deliberately does NOT fall
  * back to the debug key, so no keystore of any kind needs to be committed.
  *
@@ -86,9 +87,9 @@ module.exports = function withReleaseSigning(config) {
       );
     }
     // No release keystore => leave the APK unsigned rather than falling back to
-    // the debug key. F-Droid builds from source and signs with its own key, so an
-    // unsigned artifact is what it wants, and this keeps the debug keystore out of
-    // the repository entirely.
+    // the debug key. An unsigned APK is honest about being unsigned; one signed
+    // with the public debug key looks signed and is not. This also keeps the
+    // debug keystore out of the repository entirely.
     contents = contents.replace(
       releaseSigningLine,
       `            signingConfig hasReleaseKeystore ? signingConfigs.release : null

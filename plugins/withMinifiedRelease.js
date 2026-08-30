@@ -2,8 +2,8 @@
  * Turns R8 on for release builds, and adds the keep rules that need it.
  *
  * Expo's template sets `android.enableMinifyInReleaseBuilds` to false, so the
- * release APK shipped 38 MB of unminified dex — more than IzzyOnDroid's entire
- * 30 MB per-APK budget on its own. R8 shrinks that to a fraction of the size.
+ * release APK shipped 38 MB of unminified dex — more than the entire 30 MB
+ * per-APK budget on its own. R8 shrinks that to a fraction of the size.
  *
  * R8 is not free of risk for React Native: anything looked up reflectively from
  * C++ or by name from JavaScript has to be kept explicitly. React Native and

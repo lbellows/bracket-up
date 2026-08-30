@@ -3,17 +3,17 @@
  *
  * A universal build of this app is ~97 MB: four copies of React Native's native
  * libraries (~72 MB in total) of which a device can only ever run one. That is
- * more than three times IzzyOnDroid's 30 MB hard limit for a single APK, and
- * roughly 40 MB of it is x86 code that only runs on emulators.
+ * more than three times the 30 MB per-APK ceiling CI enforces, and roughly
+ * 40 MB of it is x86 code that only runs on emulators.
  *
  * Which architectures are built comes from the `reactNativeArchitectures` Gradle
  * property, so a single one can be selected with
- * `-PreactNativeArchitectures=arm64-v8a` — that is how F-Droid builds each APK
- * as its own entry. 32-bit x86 is dropped entirely: no phone has ever shipped
+ * `-PreactNativeArchitectures=arm64-v8a`, which is how a single architecture
+ * is built in isolation. 32-bit x86 is dropped entirely: no phone has ever shipped
  * it and only old emulator images use it.
  *
- * Each APK needs its own versionCode, because F-Droid and IzzyOnDroid index
- * APKs by versionCode and three APKs sharing one would collide. The scheme is
+ * Each APK needs its own versionCode, because an F-Droid repo indexes APKs by
+ * versionCode and three APKs sharing one would collide. The scheme is
  * `versionCode * 10 + <abi offset>`, which keeps every APK of a release
  * distinct and still below every APK of the next release.
  */
@@ -47,8 +47,8 @@ const SPLITS_GRADLE = `
 `;
 
 const VERSION_CODE_GRADLE = `
-// Give every per-ABI APK its own versionCode. F-Droid and IzzyOnDroid index APKs
-// by versionCode, so the three APKs of one release must not share one.
+// Give every per-ABI APK its own versionCode. An F-Droid repo indexes APKs by
+// versionCode, so the three APKs of one release must not share one.
 def abiVersionCodeOffsets = [${Object.entries(ABI_VERSION_CODE_OFFSETS)
   .map(([abi, offset]) => `'${abi}': ${offset}`)
   .join(', ')}]

@@ -5,14 +5,14 @@
  * leaves the .so files uncompressed so they can be mapped straight out of the
  * APK, which saves device storage and install time. But uncompressed is exactly
  * what it says: arm64-v8a's libraries are 19.3 MB in the APK, and with them the
- * arm64 APK measured 32.2 MB — over IzzyOnDroid's 30 MB hard limit, which is a
- * limit on the file they host, not on install size. Compressing them brings the
+ * arm64 APK measured 32.2 MB — over the 30 MB per-APK ceiling CI enforces,
+ * which is a limit on the download, not on install size. Compressing them brings the
  * download to roughly 22 MB and leaves room for the app to grow.
  *
  * The cost is real and worth knowing: the libraries are extracted at install
  * time, so the app occupies more space on the device than the download suggests,
- * and installs are a little slower. Between "a bit larger on disk" and "not
- * listed on IzzyOnDroid at all", this is the better trade.
+ * and installs are a little slower. For an app people download over the
+ * network, the smaller download is the better trade.
  *
  * If the app ever ships to Google Play as an app bundle, revisit this: Play
  * splits per ABI itself and prefers uncompressed libraries.

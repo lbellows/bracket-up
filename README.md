@@ -35,8 +35,9 @@ Run the suite after any change to `bracketGenerator.ts` or `doubleElimLogic.ts`.
 ## Android builds
 
 Releases are built by GitHub Actions on any `v*` tag and published to GitHub
-Releases, from where IzzyOnDroid picks them up. F-Droid builds from source using
-the recipe in `fdroid/`. See [FDROID.md](FDROID.md) for the full procedure.
+Releases. The self-hosted F-Droid repo at <https://lbellows.github.io/fdroid/>
+picks them up from there, and Obtainium can track the Releases page directly.
+See [FDROID.md](FDROID.md) for the full procedure.
 
 Each release carries one APK per CPU architecture rather than a single universal
 one — download `arm64-v8a` for any phone made in roughly the last decade,

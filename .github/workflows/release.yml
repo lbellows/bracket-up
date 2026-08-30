@@ -1,9 +1,9 @@
 name: Release APK
 
 # Builds one signed APK per CPU architecture, proves each one runs, and attaches
-# them to a GitHub Release. IzzyOnDroid watches this repo's releases and picks
-# them up automatically. Running this workflow by hand (workflow_dispatch) does
-# everything except publish, which is the way to check a build before tagging.
+# them to a GitHub Release. The self-hosted F-Droid repo pulls the APKs from
+# there. Running this workflow by hand (workflow_dispatch) does everything
+# except publish, which is the way to check a build before tagging.
 on:
   push:
     tags:
@@ -14,9 +14,10 @@ permissions:
   contents: write
 
 env:
-  # IzzyOnDroid's hard limit for a single APK. A universal APK with every
-  # architecture in it was ~97 MB, which is why the build is split per ABI and
-  # minified; this guard is here so a future dependency cannot quietly undo that.
+  # Self-imposed download-size ceiling for a single APK. A universal APK with
+  # every architecture in it was ~97 MB, which is why the build is split per ABI
+  # and minified; this guard is here so a future dependency cannot quietly undo
+  # that.
   MAX_APK_BYTES: 30000000
 
 jobs:
@@ -102,7 +103,7 @@ jobs:
             SIZE="$(stat -c%s "$APK")"
             echo "$(basename "$APK"): $ABIS, $((SIZE / 1000000)) MB"
             if [ "$SIZE" -gt "$MAX_APK_BYTES" ]; then
-              echo "::error::$(basename "$APK") is ${SIZE} bytes, over IzzyOnDroid's ${MAX_APK_BYTES}-byte limit."
+              echo "::error::$(basename "$APK") is ${SIZE} bytes, over the ${MAX_APK_BYTES}-byte ceiling."
               exit 1
             fi
             echo "::endgroup::"

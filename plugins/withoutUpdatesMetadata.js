@@ -3,10 +3,9 @@
  *
  * The Expo template emits these unconditionally, but `expo-updates` is not a
  * dependency of this app, so nothing ever reads them. They are inert, but they
- * advertise an over-the-air update mechanism that does not exist — which is
- * exactly the thing F-Droid reviewers look for, since OTA JS updates would let
- * unreviewed code reach users after their build. Dropping them keeps the
- * manifest honest about what the app can do.
+ * advertise an over-the-air update mechanism that does not exist. This app's
+ * JavaScript is compiled in at build time and cannot be replaced after
+ * installation; dropping the tags keeps the manifest honest about that.
  *
  * If expo-updates is ever added as a real dependency, delete this plugin
  * rather than working around it.
