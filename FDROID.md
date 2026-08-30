@@ -49,8 +49,11 @@ description, screenshots and changelogs live in this repo.
   checks each one is single-ABI, permission-free, signed with the release key and
   under 30 MB, installs the minified x86_64 APK on an emulator and asserts the app
   renders (`scripts/smoke-test-apk.sh`), and only then attaches them to a GitHub
-  Release. Running it by hand (`gh workflow run "Release APK" --ref <branch>`) does
-  everything except publish — that is the way to check a build before tagging.
+  Release. Each ABI builds in its own job, so the three run in parallel.
+  Running it by hand does everything except publish, and defaults to building
+  `arm64-v8a` only — the phone ABI, and the quickest way to get something
+  sideloadable. That skips the emulator smoke test, which needs the x86_64 APK;
+  pass `-f abis=all` to exercise the whole release path.
 - `fdroid/com.bracketup.app.yml` is **listing metadata, not a build recipe**. The
   self-hosted repo's publish workflow reads it (via the `recipe` key in that
   repo's `apps.json`) to fill in License, Categories, SourceCode and the app name,
@@ -181,15 +184,18 @@ sdkmanager "platform-tools" "build-tools;35.0.0" "platforms;android-35" \
    `prebuild:check` fails if any of them is missing or out of date, because a
    mismatch otherwise just shows up as an empty changelog in the repo listing.
 
-4. Optionally dry-run the whole release without publishing anything:
+4. Optionally dry-run the release without publishing anything:
 
    ```bash
    git push origin HEAD:refs/heads/release-check
-   gh workflow run "Release APK" --ref release-check
+   gh workflow run "Release APK" --ref release-check                 # arm64-v8a only
+   gh workflow run "Release APK" --ref release-check -f abis=all     # all three
    ```
 
-   This builds, runs every check including the emulator smoke test, and uploads
-   the APKs as workflow artifacts. Only a `v*` tag publishes a Release.
+   The default builds just `arm64-v8a` and uploads it as a workflow artifact —
+   the fastest way to get a build onto a phone. `abis=all` builds all three and
+   runs the emulator smoke test as well, which is what a tag does. Only a `v*`
+   tag publishes a Release.
 
 5. Commit, tag, push:
 

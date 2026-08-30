@@ -2,13 +2,29 @@ name: Release APK
 
 # Builds one signed APK per CPU architecture, proves each one runs, and attaches
 # them to a GitHub Release. The self-hosted F-Droid repo pulls the APKs from
-# there. Running this workflow by hand (workflow_dispatch) does everything
-# except publish, which is the way to check a build before tagging.
+# there.
+#
+# Each ABI builds in its own job. The native compilation is per-architecture, so
+# three parallel jobs finish in well under the wall clock of one job doing all
+# three; the repo is public, so the extra runner minutes cost nothing.
+#
+# A manual run (workflow_dispatch) does everything except publish, and defaults
+# to arm64-v8a alone — the ABI every modern phone uses, so it is both the
+# quickest check and the artifact to sideload. Pick "all" to exercise the full
+# release path. A tag always builds all three regardless.
 on:
   push:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      abis:
+        description: Which ABIs to build
+        type: choice
+        options:
+          - arm64-v8a
+          - all
+        default: arm64-v8a
 
 permissions:
   contents: write
@@ -21,8 +37,31 @@ env:
   MAX_APK_BYTES: 30000000
 
 jobs:
-  build:
+  setup:
     runs-on: ubuntu-latest
+    outputs:
+      abis: ${{ steps.pick.outputs.abis }}
+    steps:
+      # A tag builds everything that gets published. Only a manual run may
+      # narrow it, and then it defaults to the one ABI worth sideloading.
+      - id: pick
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
+             && [ "${{ inputs.abis }}" != "all" ]; then
+            echo 'abis=["arm64-v8a"]' >> "$GITHUB_OUTPUT"
+          else
+            echo 'abis=["armeabi-v7a","arm64-v8a","x86_64"]' >> "$GITHUB_OUTPUT"
+          fi
+          cat "$GITHUB_OUTPUT"
+
+  build:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      # One ABI failing should not hide whether the others are fine.
+      fail-fast: false
+      matrix:
+        abi: ${{ fromJSON(needs.setup.outputs.abis) }}
     steps:
       - uses: actions/checkout@v7
 
@@ -37,6 +76,17 @@ jobs:
           java-version: 17
 
       - uses: android-actions/setup-android@v4
+
+      # android/gradle.properties asks for 2 GB, which leaves R8 and the Kotlin
+      # compiler thrashing on a 16 GB runner. GRADLE_USER_HOME takes precedence
+      # over the project file, so this lifts the ceiling for CI without touching
+      # the committed native project (which prebuild:check would flag) or
+      # imposing a 6 GB heap on anyone building locally.
+      - name: Raise the Gradle heap for CI
+        run: |
+          mkdir -p ~/.gradle
+          printf 'org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g\n' \
+            >> ~/.gradle/gradle.properties
 
       - name: Install dependencies
         run: npm ci
@@ -54,82 +104,88 @@ jobs:
           fi
           echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
 
-      - name: Build release APKs
+      - name: Build the ${{ matrix.abi }} APK
         env:
           BRACKETUP_STORE_FILE: ${{ runner.temp }}/release.keystore
           BRACKETUP_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
           BRACKETUP_KEY_ALIAS: bracketup
           BRACKETUP_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         working-directory: android
-        run: ./gradlew assembleRelease --no-daemon
+        run: |
+          ./gradlew assembleRelease --no-daemon \
+            -PreactNativeArchitectures=${{ matrix.abi }}
 
-      - name: Check every APK is signed, single-ABI, permission-free and small enough
+      - name: Check the APK is signed, single-ABI, permission-free and small enough
+        env:
+          ABI: ${{ matrix.abi }}
         run: |
           BUILD_TOOLS="$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)"
           shopt -s nullglob
           APKS=(android/app/build/outputs/apk/release/*.apk)
-          if [ "${#APKS[@]}" -ne 3 ]; then
-            echo "::error::Expected 3 per-ABI APKs, found ${#APKS[@]}."
+          # Narrowing reactNativeArchitectures to one ABI must yield exactly one
+          # APK; more than that means the split or the property stopped working.
+          if [ "${#APKS[@]}" -ne 1 ]; then
+            echo "::error::Expected 1 APK for $ABI, found ${#APKS[@]}."
+            exit 1
+          fi
+          APK="${APKS[0]}"
+
+          echo "::group::$(basename "$APK")"
+          "$BUILD_TOOLS/aapt2" dump badging "$APK" | grep -E '^package:|^native-code:'
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
+
+          # AndroidX Core declares <applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+          # for ContextCompat.registerReceiver. It is defined by this app, namespaced to
+          # this app, and protectionLevel="signature", so no other app can ever hold it and
+          # it grants no user-facing capability. Anything else — any android.permission.*
+          # or third-party permission — means a dependency reintroduced one, which is a bug.
+          PERMS="$("$BUILD_TOOLS/aapt2" dump permissions "$APK" \
+                   | grep -E '^uses-permission:' \
+                   | grep -v 'DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION' || true)"
+          if [ -n "$PERMS" ]; then
+            echo "::error::$(basename "$APK") requests permissions it should not have:"
+            echo "$PERMS"
             exit 1
           fi
 
-          for APK in "${APKS[@]}"; do
-            echo "::group::$(basename "$APK")"
-            "$BUILD_TOOLS/aapt2" dump badging "$APK" | grep -E '^package:|^native-code:'
-            "$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
+          # The APK must carry the architecture this job was asked to build, and
+          # only that one.
+          ABIS="$(unzip -Z1 "$APK" 'lib/*' | cut -d/ -f2 | sort -u)"
+          if [ "$ABIS" != "$ABI" ]; then
+            echo "::error::$(basename "$APK") carries '$(echo $ABIS)', expected '$ABI'."
+            exit 1
+          fi
 
-            # AndroidX Core declares <applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
-            # for ContextCompat.registerReceiver. It is defined by this app, namespaced to
-            # this app, and protectionLevel="signature", so no other app can ever hold it and
-            # it grants no user-facing capability. Anything else — any android.permission.*
-            # or third-party permission — means a dependency reintroduced one, which is a bug.
-            PERMS="$("$BUILD_TOOLS/aapt2" dump permissions "$APK" \
-                     | grep -E '^uses-permission:' \
-                     | grep -v 'DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION' || true)"
-            if [ -n "$PERMS" ]; then
-              echo "::error::$(basename "$APK") requests permissions it should not have:"
-              echo "$PERMS"
-              exit 1
-            fi
+          SIZE="$(stat -c%s "$APK")"
+          echo "$(basename "$APK"): $ABIS, $((SIZE / 1000000)) MB"
+          if [ "$SIZE" -gt "$MAX_APK_BYTES" ]; then
+            echo "::error::$(basename "$APK") is ${SIZE} bytes, over the ${MAX_APK_BYTES}-byte ceiling."
+            exit 1
+          fi
+          echo "::endgroup::"
 
-            # One architecture per APK: a universal build would sail past the size
-            # limit below without anyone noticing which APK it came from.
-            ABIS="$(unzip -Z1 "$APK" 'lib/*' | cut -d/ -f2 | sort -u)"
-            if [ "$(echo "$ABIS" | wc -l)" -ne 1 ]; then
-              echo "::error::$(basename "$APK") contains more than one ABI: $(echo $ABIS)"
-              exit 1
-            fi
-
-            SIZE="$(stat -c%s "$APK")"
-            echo "$(basename "$APK"): $ABIS, $((SIZE / 1000000)) MB"
-            if [ "$SIZE" -gt "$MAX_APK_BYTES" ]; then
-              echo "::error::$(basename "$APK") is ${SIZE} bytes, over the ${MAX_APK_BYTES}-byte ceiling."
-              exit 1
-            fi
-            echo "::endgroup::"
-          done
-
-      - name: Name the APKs after the release
+      - name: Name the APK after the release
         run: |
           VERSION="$(node -p "require('./app.json').expo.version")"
           mkdir -p dist
-          for APK in android/app/build/outputs/apk/release/*.apk; do
-            ABI="$(basename "$APK" | sed -E 's/^app-(.*)-release\.apk$/\1/')"
-            cp "$APK" "dist/BracketUp-${VERSION}-${ABI}.apk"
-          done
+          cp android/app/build/outputs/apk/release/*.apk \
+            "dist/BracketUp-${VERSION}-${{ matrix.abi }}.apk"
           ls -l dist
 
       - uses: actions/upload-artifact@v7
         with:
-          name: apks
+          name: apk-${{ matrix.abi }}
           path: dist/*.apk
           if-no-files-found: error
 
   smoke-test:
     # R8 runs over release builds, and a missing keep rule only shows up at
     # runtime, so the APK is installed and the first screen checked before
-    # anything is published.
-    needs: build
+    # anything is published. The emulator is x86_64, so this can only run when
+    # that ABI was built — an arm64-only dry run skips it and is checked on the
+    # phone instead.
+    needs: [setup, build]
+    if: contains(needs.setup.outputs.abis, 'x86_64')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -141,7 +197,8 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: apks
+          pattern: apk-*
+          merge-multiple: true
           path: dist
 
       - name: Enable KVM for the emulator
@@ -167,8 +224,22 @@ jobs:
     steps:
       - uses: actions/download-artifact@v8
         with:
-          name: apks
+          pattern: apk-*
+          merge-multiple: true
           path: dist
+
+      # The per-ABI jobs each check their own APK; nothing until here sees all
+      # three together, and a release missing one would strand those devices.
+      - name: Check all three APKs are present
+        run: |
+          shopt -s nullglob
+          APKS=(dist/*.apk)
+          if [ "${#APKS[@]}" -ne 3 ]; then
+            echo "::error::Expected 3 APKs to publish, found ${#APKS[@]}."
+            ls -l dist
+            exit 1
+          fi
+          ls -l dist
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v3
