@@ -3,18 +3,23 @@
 BracketUp is a good fit for F-Droid: MIT licensed, fully offline, no analytics or
 advertising, no Google Play Services, and it ships with **zero Android permissions**.
 
-There are two destinations, and it is worth using both:
+There are two destinations:
 
-| | IzzyOnDroid | F-Droid main repo |
+| | Self-hosted repo | F-Droid main repo |
 |---|---|---|
 | Who builds the APK | you (GitHub Actions) | F-Droid, from source |
 | Who signs it | you | F-Droid |
-| Time to listing | days | weeks to months |
-| Shows in F-Droid client | after the user adds the Izzy repo | by default |
+| Time to listing | immediate | weeks to months |
+| Shows in F-Droid client | after the user adds the repo | by default |
+| Depends on anyone's review | no | yes |
 
-Ship to IzzyOnDroid first so people can install the app now, then submit to the
-main repo. Both read their store listing from `fastlane/metadata/android/en-US/`
-in this repo, so the description, screenshots and changelogs are already in place.
+The self-hosted repo is live now and is the reason distribution does not hinge on
+any review queue. The main repo is worth pursuing on top of it, for the
+discoverability of being listed by default. Both read their store listing from
+`fastlane/metadata/android/en-US/` in this repo, so the description, screenshots
+and changelogs are already in place.
+
+IzzyOnDroid is **not** a destination for this app — see below.
 
 ---
 
@@ -32,19 +37,19 @@ in this repo, so the description, screenshots and changelogs are already in plac
   committed to this repository**, not even the public Android debug key.
 - The release build is **split per CPU architecture** and **minified**
   (`plugins/withAbiSplits.js`, `plugins/withMinifiedRelease.js`). This is not
-  cosmetic: IzzyOnDroid's hard limit is 30 MB for a single APK, and the universal
-  unminified APK was 97 MB — 72 MB of native libraries for four architectures of
+  cosmetic: the universal unminified APK was 97 MB — 72 MB of native libraries for four architectures of
   which a device runs one, plus 38 MB of unminified dex. 32-bit x86 is dropped
   altogether; nothing but old emulators uses it.
 - Native libraries are stored **compressed** in the APK
   (`plugins/withCompressedNativeLibs.js`). Even split per ABI and minified, the
   arm64 APK measured 32.2 MB with them uncompressed — Expo's default, and the
-  faster one to install. Compressed it is about 22 MB. Izzy's limit is on the
-  file they host, so download size is the one that decides whether the app is
-  listed; the trade is a slightly larger install footprint on the device.
+  faster one to install. Compressed it is about 22 MB. The trade is a slightly
+  larger install footprint on the device in exchange for a much smaller download.
+  CI still enforces a 30 MB ceiling per APK — originally IzzyOnDroid's limit, kept
+  because it is a useful guard against a dependency quietly undoing the split.
 - Each per-ABI APK gets its own versionCode, `versionCode * 10 + <abi offset>`
-  (armeabi-v7a 1, arm64-v8a 2, x86_64 3), because F-Droid and IzzyOnDroid index
-  APKs by versionCode and three APKs sharing one would collide. So versionCode 2
+  (armeabi-v7a 1, arm64-v8a 2, x86_64 3), because F-Droid indexes APKs by
+  versionCode and three APKs sharing one would collide. So versionCode 2
   in `app.json` ships as APKs 21, 22 and 23.
 - `.github/workflows/release.yml` builds the three signed APKs on any `v*` tag,
   checks each one is single-ABI, permission-free, signed with the release key and
@@ -91,8 +96,9 @@ produced by default since JDK 9 — and Gradle reads it with no extra configurat
 The store password and key password are identical, as PKCS12 requires.
 
 > **Back this up now, somewhere off this machine.** The key identifies BracketUp
-> forever. Lose it and IzzyOnDroid users cannot upgrade: they must uninstall and
-> reinstall, losing their saved tournaments. Both files matter — the keystore is
+> forever. Lose it and everyone who installed from the GitHub Releases or the
+> self-hosted repo cannot upgrade: they must uninstall and reinstall, losing their
+> saved tournaments. Both files matter — the keystore is
 > useless without its password.
 
 To recreate an equivalent key elsewhere (with a JDK available):
@@ -210,47 +216,58 @@ Releases.
 
 ---
 
-## Submitting to IzzyOnDroid
+## The self-hosted repository
 
-The tracker moved. The old GitLab repo is archived and read-only; inclusion
-requests now go to Codeberg:
+Published from <https://github.com/lbellows/fdroid> to GitHub Pages. Users add:
 
-- Issues: <https://codeberg.org/IzzyOnDroid/repodata/issues> — the maintenance
-  repo, not `IzzyOnDroid/repo`. Title requests `[AppRequest] <app name>`.
-- Policy: <https://izzyondroid.org/docs/general/AppInclusionPolicy/>
+```
+https://lbellows.github.io/fdroid/repo?fingerprint=<index fingerprint>
+```
 
-The issue template asks you to confirm that you are the developer, that the app
-follows the inclusion policy, that it is not already listed or requested, and
-that the repository has a fastlane folder. All four hold here.
+The landing page at <https://lbellows.github.io/fdroid/> shows the current
+copy-pasteable URL and lists what is published. Including `?fingerprint=` pins
+the repository to its signing key so the client verifies it rather than the user
+comparing hex by eye.
 
-Where this app stands against the policy:
+That repo's workflow pulls the APKs from every GitHub Release here, copies
+`fastlane/metadata/android/` into the layout `fdroid update` expects, signs the
+index, and deploys. It runs nightly and on demand, so a new release is picked up
+within a day with nothing to file. Adding an app is one line in its `apps.json`.
 
-| Requirement | BracketUp |
-|---|---|
-| OSI/FSF-approved license, no proprietary components | MIT; no Play Services, no closed dependency |
-| No ads, analytics or other trackers | none — the app makes no network requests at all |
-| APK on a tagged release, signed with a release key | GitHub Releases, signed by `.github/workflows/release.yml` |
-| Not debuggable, not testOnly | release build type |
-| 30 MB per APK, hard limit | checked in CI for every APK |
-| Fastlane metadata (descriptions, icon, screenshots) | `fastlane/metadata/android/en-US/` |
-| End-user app with a unique package name | `com.bracketup.app` |
+The index is signed with a **dedicated key**, not this app's release key, so the
+repository's identity does not depend on which apps are in it. The APKs keep
+their own signatures, so moving between GitHub Releases and this repo does not
+require a reinstall. That index key is as unrecoverable as a release keystore: if
+it is lost, every user has to remove and re-add the repository, because a
+re-signed index reads as a different repo.
 
-File the request with:
+[Obtainium](https://obtainium.imranr.dev/) is the third option and needs nothing
+from us — it tracks the GitHub Releases page directly.
 
-- Repository: `https://github.com/lbellows/bracket-up`
-- Package name: `com.bracketup.app`
-- Which APK to track: **`BracketUp-<version>-arm64-v8a.apk`**. A release carries
-  three per-ABI APKs and IzzyOnDroid hosts one build per app, so say which one.
-  arm64-v8a is the right choice: recent phones (Pixel 7 and later, and every
-  device on newer ARM cores) cannot execute 32-bit ARM code at all, so an
-  armeabi-v7a build would simply not install for them.
+---
 
-Izzy's scanner checks the APK for tracking libraries and non-free blobs. There
-are none, so this should pass without changes.
+## IzzyOnDroid: rejected, do not resubmit
 
-After inclusion, every new GitHub Release is picked up automatically — usually
-within a day — and you do not file anything again. Users install by adding
-`https://apt.izzysoft.de/fdroid/repo` as a repository in the F-Droid client.
+BracketUp was submitted and **rejected under IzzyOnDroid's AI policy**. Kids
+Doodle was rejected the same way, so this is a property of how these apps are
+built, not of any one submission.
+
+The [policy](https://izzyondroid.org/docs/general/AppInclusionPolicy/) reads:
+
+> We are strongly opposed to apps which are fully or in part created by
+> generative AI tools. [...] Vibe-coded apps will be rejected. Readme, Changelogs
+> and similar documentation files are allowed to include LLM-generated texts, but
+> the code itself should be free of it. Using LLMs for research, brainstorming,
+> inspiration, debugging, look-ups, and comparable "read-only" tasks, is
+> acceptable — provided their output is not included in the app's code.
+
+It is about the provenance of the app's code, not about packaging. No metadata
+change, recipe fix, or resubmission addresses it, and there is nothing to appeal.
+Do not re-add an Izzy path here or suggest resubmitting.
+
+What survived the rejection is still useful: the fastlane metadata, the per-ABI
+split, and the 30 MB size guard in CI. F-Droid reads the same metadata directory,
+and the size guard is worth keeping regardless of who is enforcing a limit.
 
 ---
 
@@ -283,7 +300,7 @@ work on an ordinary machine, no Docker or Android SDK needed for the first:
 fdroid lint -f com.bracketup.app        # metadata + canonical formatting
 fdroid rewritemeta com.bracketup.app    # must leave the file unchanged
 
-# the scan Izzy and fdroiddata both run over the built APKs
+# the scan fdroiddata runs over the built APKs
 fdroid scanner -r -e BracketUp-<version>-arm64-v8a.apk
 
 # the source-tree scan; clones the tag and runs `npm ci`, needs no Android SDK
@@ -342,7 +359,8 @@ If a reviewer questions the download, the answer is that it is not a workaround
 invented for F-Droid. The `build` and `smoke-test` jobs in
 `.github/workflows/release.yml` both run `actions/setup-java` with
 `distribution: temurin, java-version: 17`, so every APK on the GitHub Releases
-page — including the one IzzyOnDroid serves — is already built with Temurin 17.
+page — including the ones the self-hosted repo serves — is already built with
+Temurin 17.
 Pinning it here only makes the buildserver match how the app is built
 everywhere else.
 
