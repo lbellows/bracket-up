@@ -76,6 +76,10 @@ jobs:
           java-version: 17
 
       - uses: android-actions/setup-android@v4
+        with:
+          # The action's default set still includes the obsolete "tools", which
+          # Google has removed from the SDK repository, so the default now fails.
+          packages: platform-tools
 
       # android/gradle.properties asks for 2 GB, which leaves R8 and the Kotlin
       # compiler thrashing on a 16 GB runner. GRADLE_USER_HOME takes precedence
