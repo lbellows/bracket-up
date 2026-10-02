@@ -1,6 +1,6 @@
 # Distributing BracketUp
 
-BracketUp is MIT licensed, fully offline, has no analytics or advertising, no
+BracketUp is AGPL-3.0 licensed, fully offline, has no analytics or advertising, no
 Google Play Services, and ships with **zero Android permissions**.
 
 It is distributed two ways, both driven by the same GitHub Actions release:
