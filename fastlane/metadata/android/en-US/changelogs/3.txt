@@ -1,0 +1,5 @@
+Maintenance release. Updated to the latest Expo SDK 57 and React Native 0.86
+patch releases, with security fixes in the build tooling. Nothing about the app
+itself has changed.
+
+BracketUp is now licensed under the AGPL-3.0-or-later (previously MIT).

@@ -2,7 +2,7 @@
   "expo": {
     "name": "BracketUp",
     "slug": "bracketup",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -19,7 +19,7 @@
         "backgroundColor": "#0f172a"
       },
       "package": "com.bracketup.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [],
       "blockedPermissions": [
         "android.permission.INTERNET",
